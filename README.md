@@ -5,9 +5,9 @@ ClearSky テーマ、ガラス調のウィンドウ効果 Aozora Glass、Limine 
 
 [AirSkyOS](https://archive.org/details/airskyos)
 
-このリポジトリには、AirSkyOS を作るためのソースコード一式が入っています。
+このリポジトリには、AirSkyOS で使用されたソースコード一式が入っています。
 
-- CachyOS や Arch Linux の更新で OS 名・ロゴ・テーマが元に戻らないようにするパッケージ
+- CachyOS や Arch Linux の更新で OS 名・ロゴ・テーマが上書きされないようにするパッケージ
 - テーマファイル
 - ようこそアプリ
 - 配布用 ISO の作成キット
