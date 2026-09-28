@@ -3,6 +3,8 @@
 [CachyOS](https://cachyos.org/)(Arch Linux ベース)と KDE Plasma 6 を元にした自作ディストリビューションです。
 ClearSky テーマ、ガラス調のウィンドウ効果 Aozora Glass、Limine ブートローダー、AirSkyOS 仕様のインストーラーを備えています。
 
+[AirSkyOS](https://archive.org/details/airskyos)
+
 このリポジトリには、AirSkyOS を作るためのソースコード一式が入っています。
 
 - CachyOS や Arch Linux の更新で OS 名・ロゴ・テーマが元に戻らないようにするパッケージ
