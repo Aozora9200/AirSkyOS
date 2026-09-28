@@ -1,0 +1,8 @@
+# makepkg output
+*.pkg.tar.*
+packages/*/src/
+packages/*/pkg/
+*.log
+__pycache__/
+# downloaded by scripts/fetch-third-party.sh
+theme/plasmoids/

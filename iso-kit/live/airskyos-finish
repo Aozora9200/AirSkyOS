@@ -1,0 +1,20 @@
+#!/bin/bash
+# AirSkyOS: very last installer step inside the new system (end of
+# shellprocess.conf, after dmcheck / shell-setup / bootloader-post-setup and
+# airskyos-limine). Removes the installer itself, which the earlier steps
+# still needed, and the packages that could not go before because of it.
+
+T=${AIRSKYOS_TEST_ROOT:-}   # for testing only; empty in the installer
+
+# @AIRSKYOS_LATE_PACKAGES@
+
+for p in "${_late[@]}"; do
+  [ -z "$T" ] || continue
+  pacman -Qq "$p" >/dev/null 2>&1 || continue
+  pacman -Rns --noconfirm "$p" >/dev/null 2>&1 && echo "removed: $p" || echo "kept (still needed): $p"
+done
+
+rm -rf "$T/etc/calamares" "$T/usr/share/calamares" \
+       "$T/usr/local/bin/dmcheck" "$T/usr/local/bin/removeun" "$T/usr/local/bin/remove-nvidia" \
+       "$T/usr/local/bin/airskyos-finish"
+exit 0

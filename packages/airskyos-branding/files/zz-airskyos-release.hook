@@ -1,0 +1,15 @@
+# Runs after CachyOS's os-release.hook / lsb-release.hook / cachyos-branding.hook
+# (hooks run in file-name order), so the AirSkyOS name and logo always win.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = filesystem
+Target = lsb-release
+Target = cachyos-hooks
+Target = airskyos-release
+
+[Action]
+Description = Restoring AirSkyOS branding (os-release, lsb-release, issue)...
+When = PostTransaction
+Exec = /usr/share/libalpm/scripts/airskyos-branding release

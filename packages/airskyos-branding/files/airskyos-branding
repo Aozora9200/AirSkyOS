@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# AirSkyOS branding enforcer.
+# Called from zz-airskyos-*.hook, which sort after CachyOS's own hooks
+# (cachyos-branding / os-release.hook / lsb-release.hook), so AirSkyOS wins.
+#
+#   airskyos-branding release            os-release / lsb-release / issue
+#   airskyos-branding plymouth [--rebuild]
+#   airskyos-branding plymouth-hook      (reads pacman targets on stdin)
+#   airskyos-branding all                (also runs airskyos-limine)
+
+set -u
+
+CONF=/etc/airskyos/branding.conf
+DATA=/usr/share/airskyos
+
+OS_RELEASE=1
+LSB_RELEASE=1
+ISSUE=1
+PLYMOUTH_THEME=airsky-bootanimation
+# shellcheck source=/dev/null
+[[ -r $CONF ]] && . "$CONF"
+
+msg()  { printf '==> AirSkyOS: %s\n' "$*"; }
+warn() { printf '==> AirSkyOS WARNING: %s\n' "$*" >&2; }
+
+# Atomically replace $2 with the contents of $1.
+# mv(1) replaces a symlink itself, so /usr/lib/os-release is never touched.
+install_file() {
+    local src=$1 dst=$2 tmp
+    if [[ -f $dst && ! -L $dst ]] && cmp -s "$src" "$dst"; then
+        return 0
+    fi
+    tmp=$(mktemp "${dst}.airskyos.XXXXXX") || return 1
+    if cat "$src" >"$tmp" && chmod 644 "$tmp" && mv -f "$tmp" "$dst"; then
+        msg "updated $dst"
+    else
+        rm -f "$tmp"
+        warn "could not update $dst"
+        return 1
+    fi
+}
+
+pretty_name() {
+    (
+        # shellcheck source=/dev/null
+        . "$DATA/os-release" 2>/dev/null
+        printf '%s' "${PRETTY_NAME:-AirSkyOS}"
+    )
+}
+
+update_os_release() {
+    [[ $OS_RELEASE == 1 && -f $DATA/os-release ]] || return 0
+    install_file "$DATA/os-release" /etc/os-release
+}
+
+update_lsb_release() {
+    [[ $LSB_RELEASE == 1 && -f /etc/lsb-release ]] || return 0
+    local name
+    name=$(pretty_name)
+    # DISTRIB_ID stays "cachyos" (same as ID= in os-release) for tool compatibility.
+    sed -i --follow-symlinks /etc/lsb-release \
+        -e "s|^DISTRIB_DESCRIPTION=.*\$|DISTRIB_DESCRIPTION=\"${name}\"|"
+}
+
+update_issue() {
+    [[ $ISSUE == 1 ]] || return 0
+    local name f
+    name=$(pretty_name)
+    for f in /etc/issue /usr/share/factory/etc/issue; do
+        [[ -f $f ]] || continue
+        sed -i --follow-symlinks \
+            -e "s|CachyOS Linux|${name}|g" \
+            -e "s|Arch Linux|${name}|g" "$f"
+    done
+}
+
+rebuild_initramfs() {
+    msg "rebuilding initramfs for the boot animation..."
+    # In a chroot (ISO build, arch-chroot) there is no mounted EFI partition,
+    # so boot-loader specific wrappers such as limine-mkinitcpio fail.
+    # Build the images with plain mkinitcpio there.
+    if systemd-detect-virt -q --chroot 2>/dev/null && command -v mkinitcpio >/dev/null 2>&1; then
+        mkinitcpio -P || warn "mkinitcpio reported errors"
+        return 0
+    fi
+    if [[ -x /usr/bin/update-initramfs ]]; then      # provided by cachyos-hooks
+        /usr/bin/update-initramfs
+    elif command -v limine-mkinitcpio >/dev/null 2>&1; then
+        limine-mkinitcpio
+    elif command -v mkinitcpio >/dev/null 2>&1; then
+        mkinitcpio -P
+    elif command -v dracut-rebuild >/dev/null 2>&1; then
+        dracut-rebuild
+    else
+        warn "no initramfs generator found; please rebuild the initramfs manually"
+    fi
+}
+
+update_plymouth() {
+    local force_rebuild=${1:-0} current
+    [[ -n $PLYMOUTH_THEME ]] || return 0
+    command -v plymouth-set-default-theme >/dev/null 2>&1 || return 0
+    if [[ ! -d /usr/share/plymouth/themes/$PLYMOUTH_THEME ]]; then
+        warn "plymouth theme '$PLYMOUTH_THEME' is not installed"
+        return 0
+    fi
+    current=$(plymouth-set-default-theme 2>/dev/null)
+    if [[ $current != "$PLYMOUTH_THEME" ]]; then
+        msg "plymouth theme: ${current:-none} -> $PLYMOUTH_THEME"
+        plymouth-set-default-theme "$PLYMOUTH_THEME" || return 1
+        force_rebuild=1
+    fi
+    [[ $force_rebuild == 1 ]] && rebuild_initramfs
+    return 0
+}
+
+case "${1:-all}" in
+    release)
+        update_os_release
+        update_lsb_release
+        update_issue
+        ;;
+    plymouth)
+        [[ ${2:-} == --rebuild ]] && update_plymouth 1 || update_plymouth 0
+        ;;
+    plymouth-hook)
+        # Rebuild only when our theme files changed; otherwise just make sure
+        # the selected theme is still ours.
+        rebuild=0
+        while read -r target; do
+            [[ $target == airskyos-plymouth-theme ]] && rebuild=1
+        done
+        update_plymouth "$rebuild"
+        ;;
+    all)
+        update_os_release
+        update_lsb_release
+        update_issue
+        update_plymouth 0
+        [[ -x /usr/share/libalpm/scripts/airskyos-limine ]] && /usr/share/libalpm/scripts/airskyos-limine
+        ;;
+    *)
+        echo "usage: $0 {release|plymouth [--rebuild]|plymouth-hook|all}" >&2
+        exit 1
+        ;;
+esac
+exit 0

@@ -1,0 +1,29 @@
+#!/bin/sh
+# Live ISO session helper (does nothing on an installed system).
+#  - puts "Install AirSkyOS" on the desktop
+#  - the AirSkyOS welcome screen starts by itself (its own autostart entry)
+#    and shows an install button on the live ISO
+#  - only if the welcome app is missing, the installer is opened directly
+[ -d /run/archiso ] || exit 0
+
+# make the installer AirSkyOS (and point it at this boot's live image) even
+# if Calamares is later started some other way than "Install AirSkyOS"
+sudo -n /usr/local/bin/airskyos-installer-setup >/tmp/airskyos-installer-setup.log 2>&1 || true
+
+desk=$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")
+mkdir -p "$desk"
+cp -f /usr/share/applications/airskyos-install.desktop "$desk/"
+chmod +x "$desk/airskyos-install.desktop"
+
+if command -v airskyos-welcome >/dev/null 2>&1; then
+    # make sure a leftover "don't show on startup" setting can't hide it
+    conf="$HOME/.config/AirSkyOS/welcome.conf"
+    [ -f "$conf" ] && sed -i 's/^showOnStartup=.*/showOnStartup=true/' "$conf"
+    exit 0
+fi
+
+stamp="${XDG_RUNTIME_DIR:-/tmp}/airskyos-installer-started"
+[ -e "$stamp" ] && exit 0
+touch "$stamp"
+sleep 4
+exec /usr/local/bin/airskyos-install

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Install AirSkyOS
+Name[ja]=AirSkyOS をインストール
+Comment=Install AirSkyOS on this computer
+Comment[ja]=このコンピューターに AirSkyOS をインストールします
+Exec=/usr/local/bin/airskyos-install
+Icon=AirSky-logo
+Terminal=false
+Categories=System;

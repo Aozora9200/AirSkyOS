@@ -1,0 +1,271 @@
+# Maintainer: Aozora <aozora9200@gmail.com>
+#
+# AirSkyOS KDE theme files, built from the theme/ folder of this repository.
+# Everything is installed system-wide under /usr/share.
+#
+#   1. ../../scripts/fetch-third-party.sh   (downloads the two widgets)
+#   2. makepkg -sf
+#   3. sudo pacman -U airskyos-kde-theme-*.pkg.tar.zst
+#
+# Another theme folder can be used with AIRSKY_SRC=/path/to/folder makepkg -sf
+# Folders that are missing are skipped with a warning; only ClearSky is required.
+
+pkgname=airskyos-kde-theme
+pkgver=2026.09.26
+pkgrel=5
+pkgdesc="AirSkyOS ClearSky global theme, Plasma styles, widgets, Konsole profile, cursors, wallpaper"
+arch=('any')
+url="https://github.com/aozora9200/AirSkyOS"
+license=('GPL-2.0-or-later' 'GPL-3.0-only' 'GPL-3.0-or-later' 'CC-BY-SA-4.0' 'Apache-2.0')
+depends=(plasma-workspace kwin kvantum airskyos-kde-settings)
+makedepends=(python)
+optdepends=('konsole: AirSkyOS terminal profile')
+source=()
+
+_src="${AIRSKY_SRC:-$startdir/../../theme}"
+
+# Desktop widget positions (pixels: x,y,width,height, top-left origin)
+_widgets=(
+    "material.clock:32,112,368,304"
+    "org.kde.plasma.brightness:32,416,368,272"
+)
+# Title-bar buttons and window title: extra offset from the left edge (px / dp)
+_title_shift=10
+
+# Window title colour for the dark decoration (R,G,B[,A])
+_dark_title_active=255,255,255
+_dark_title_inactive=255,255,255,150
+
+# Kvantum theme: installed under an AirSkyOS name. The repository already
+# ships it renamed; a folder with the upstream name is renamed while building.
+_kvantum_src=mac-tahoe-liquid-kde
+_kvantum_name=aozora-glass-kde
+
+# Application launcher icons (installed by airskyos-kde-settings)
+_light_launcher_icon=/usr/share/airskyos/aozora1.png
+_dark_launcher_icon=/usr/share/airskyos/aozora.png
+
+_tree() {   # _tree <source dir> <dest dir>
+    local src=$1 dst=$2
+    if [[ ! -d $src ]]; then
+        warning "not found, skipped: ${src#$_src/}"
+        return 1
+    fi
+    install -d "$dst"
+    cp -rL --no-preserve=mode,ownership "$src/." "$dst/"   # -L: the repository stores duplicate images as symlinks
+    find "$dst" -type d -exec chmod 755 {} +
+    find "$dst" -type f -exec chmod 644 {} +
+}
+
+# Give the desktop widgets real positions. Plasma 6 exports them as 0,0 and
+# keeps the real position in ItemGeometries keyed by applet IDs that change
+# on every new layout, so a fresh desktop centred them.
+_fix_layout() {
+    local js=$1 w id px gu=18 map="" gx=""
+    for w in "${_widgets[@]}"; do
+        id=${w%%:*}; px=${w#*:}
+        map+="\"$id\": [$px], "
+        gx+="$id=$px;"
+    done
+    # 1) geometry.* (grid units) for loadSerializedLayout
+    awk -v spec="$gx" -v gu="$gu" '
+        BEGIN { n = split(spec, a, ";"); for (i = 1; i <= n; i++) if (a[i] != "") {
+                    split(a[i], kv, "="); split(kv[2], v, ",");
+                    X[kv[1]] = int(v[1]/gu + .5); Y[kv[1]] = int(v[2]/gu + .5);
+                    W[kv[1]] = int(v[3]/gu + .5); H[kv[1]] = int(v[4]/gu + .5) } }
+        /"geometry\.(height|width|x|y)"/ { buf[++nb] = $0; next }
+        nb > 0 && /"plugin":/ {
+            match($0, /"plugin": *"[^"]*"/); p = substr($0, RSTART, RLENGTH)
+            sub(/"plugin": *"/, "", p); sub(/"$/, "", p)
+            for (i = 1; i <= nb; i++) {
+                l = buf[i]
+                if (p in X) {
+                    if (l ~ /geometry\.height/) sub(/: *[0-9.]+/, ": " H[p], l)
+                    if (l ~ /geometry\.width/)  sub(/: *[0-9.]+/, ": " W[p], l)
+                    if (l ~ /geometry\.x"/)     sub(/: *[0-9.]+/, ": " X[p], l)
+                    if (l ~ /geometry\.y"/)     sub(/: *[0-9.]+/, ": " Y[p], l)
+                }
+                print l
+            }
+            nb = 0; print; next }
+        nb > 0 { for (i = 1; i <= nb; i++) print buf[i]; nb = 0 }
+        { print }' "$js" >"$js.new" && mv "$js.new" "$js"
+
+    # 2) stale ItemGeometries (old applet IDs) and the hard-coded home path
+    sed -i -e '/"ItemGeometries[^"]*": /d' \
+           -e 's|"SlidePaths": "/home/[^"]*"|"SlidePaths": "/usr/share/wallpapers/"|' "$js"
+
+    # 3) write ItemGeometries for the IDs the new layout actually got (pixels)
+    cat >>"$js" <<JS
+
+// --- AirSkyOS: keep desktop widgets at the top-left -----------------------
+(function () {
+    var geo = { ${map%, } };
+    var ds = desktops();
+    for (var i = 0; i < ds.length; ++i) {
+        var ws = ds[i].widgets(), parts = [];
+        for (var j = 0; j < ws.length; ++j) {
+            var g = geo[ws[j].type];
+            if (g) parts.push("Applet-" + ws[j].id + ":" + g.join(",") + ",0");
+        }
+        if (parts.length) {
+            ds[i].currentConfigGroup = [];
+            ds[i].writeConfig("ItemGeometriesHorizontal", parts.join(";") + ";");
+            ds[i].writeConfig("ItemGeometriesVertical", parts.join(";") + ";");
+            ds[i].reloadConfig();
+        }
+    }
+})();
+JS
+}
+
+# Move the title-bar buttons and the window title right by $_title_shift.
+# Aurorae reads "<theme>rc"; the shipped rc is named after the theme it was
+# copied from (ChromeOS-*rc) and is therefore ignored. To keep the current
+# look, the correctly named rc only overrides the left title edge; every other
+# value stays at the Aurorae default, exactly as before.
+_aurorae_shift() {
+    local dir=$1 name rc
+    name=$(basename "$dir")
+    rc="$dir/${name}rc"
+    if [[ ! -f $rc ]]; then
+        printf '[General]\n\n[Layout]\n' >"$rc"
+    fi
+    local left maxleft
+    left=$(sed -n 's/^TitleEdgeLeft=//p' "$rc");            left=${left:-5}
+    maxleft=$(sed -n 's/^TitleEdgeLeftMaximized=//p' "$rc"); maxleft=${maxleft:-0}
+    sed -i '/^TitleEdgeLeft=/d; /^TitleEdgeLeftMaximized=/d' "$rc"
+    grep -q '^\[Layout\]' "$rc" || printf '\n[Layout]\n' >>"$rc"
+    sed -i "/^\[Layout\]/a TitleEdgeLeft=$((left + _title_shift))\nTitleEdgeLeftMaximized=$((maxleft + _title_shift))" "$rc"
+    chmod 644 "$rc"
+}
+
+# White window title on the dark decoration (the Aurorae default is black).
+_aurorae_title_colour() {
+    local rc="$1/$(basename "$1")rc"
+    sed -i '/^ActiveTextColor=/d; /^InactiveTextColor=/d' "$rc"
+    grep -q '^\[General\]' "$rc" || sed -i '1i [General]\n' "$rc"
+    sed -i "/^\[General\]/a ActiveTextColor=$2\nInactiveTextColor=$3" "$rc"
+}
+
+prepare() {
+    if [[ ! -d $_src/ClearSky ]]; then
+        error "Airsky folder not found: $_src"
+        plain "Run makepkg inside packages/airskyos-kde-theme of the repository, or set AIRSKY_SRC=/path/to/theme"
+        return 1
+    fi
+}
+
+package() {
+    local s="$pkgdir/usr/share" lnf d st
+    local legacy_splash="$_src/splashscreen/org.kde.breeze.desktop/contents/splash"
+
+    # --- global themes -----------------------------------------------------
+    for lnf in "ClearSky" "ClearSky Dark"; do
+        _tree "$_src/$lnf" "$s/plasma/look-and-feel/$lnf" || continue
+        d="$s/plasma/look-and-feel/$lnf/contents"
+
+        # splash: use the theme's own, or the old Breeze-override folder
+        if [[ ! -f $d/splash/Splash.qml && -f $legacy_splash/Splash.qml ]]; then
+            _tree "$legacy_splash" "$d/splash"
+        fi
+        if [[ -f $d/splash/Splash.qml ]]; then
+            rm -f "$d/splash/Splash.bak.qml"
+            # busyIndicator was removed from the custom splash
+            sed -i 's|introAnimation.target = busyIndicator;|introAnimation.target = content;|' "$d/splash/Splash.qml"
+        fi
+
+        [[ -f $d/layouts/org.kde.plasma.desktop-layout.js ]] &&
+            _fix_layout "$d/layouts/org.kde.plasma.desktop-layout.js"
+    done
+
+    # launcher icons: light -> aozora1.png, dark -> aozora.png
+    _set_icon() {
+        local js="$s/plasma/look-and-feel/$1/contents/layouts/org.kde.plasma.desktop-layout.js"
+        [[ -f $js ]] && sed -i "s|\"icon\": \"[^\"]*\"|\"icon\": \"$2\"|" "$js"
+        return 0
+    }
+    _set_icon "ClearSky"      "$_light_launcher_icon"
+    _set_icon "ClearSky Dark" "$_dark_launcher_icon"
+
+    # dark theme: AOSP cursors
+    d="$s/plasma/look-and-feel/ClearSky Dark/contents"
+    [[ -f $d/defaults ]] && sed -i 's|^cursorTheme=.*|cursorTheme=aosp-cursors|' "$d/defaults"
+
+    # --- Plasma styles, window decorations, Kvantum, wallpapers ------------
+    for st in "$_src/Plasma Style"/*/; do
+        [[ -d $st ]] || continue
+        d="$s/plasma/desktoptheme/$(basename "$st")"
+        _tree "${st%/}" "$d"
+        # keep the author credit, drop third-party product names from the UI
+        sed -i -e 's|^Comment=Liquid |Comment=Glass |' \
+               -e 's|github.com/lestercorderomurillo/[^"]*|github.com/lestercorderomurillo|' \
+               "$d"/metadata.desktop "$d"/metadata.json 2>/dev/null || true
+    done
+    for st in "$_src/aurorae"/*/; do
+        [[ -d $st ]] || continue
+        _tree "${st%/}" "$s/aurorae/themes/$(basename "$st")"
+        # solid white (light) / black (dark) discs behind the title-bar buttons
+        local variant=light
+        [[ ${st,,} == *dark* ]] && variant=dark
+        python "$startdir/aurorae-buttons.py" "$s/aurorae/themes/$(basename "$st")" "$variant"
+        _aurorae_shift "$s/aurorae/themes/$(basename "$st")"
+        if [[ $variant == dark ]]; then
+            _aurorae_title_colour "$s/aurorae/themes/$(basename "$st")" "$_dark_title_active" "$_dark_title_inactive"
+        fi
+    done
+    for st in "$_src/kvantum"/*/; do
+        [[ -d $st ]] || continue
+        local kname; kname=$(basename "$st")
+        if [[ $kname == "$_kvantum_src" || $kname == "$_kvantum_name" ]]; then
+            _tree "${st%/}" "$s/Kvantum/$_kvantum_name"
+            local f
+            for f in "$s/Kvantum/$_kvantum_name/$_kvantum_src"*; do
+                [[ -e $f ]] || continue
+                mv "$f" "$s/Kvantum/$_kvantum_name/${_kvantum_name}${f##*/$_kvantum_src}"
+            done
+            sed -i 's|^comment=.*|comment=Translucent glass theme for AirSkyOS|' "$s/Kvantum/$_kvantum_name"/*.kvconfig
+            sed -i 's|sodipodi:docname="MacTahoe\(Dark\)\{0,1\}\.svg"|sodipodi:docname="AozoraGlass\1.svg"|' "$s/Kvantum/$_kvantum_name"/*.svg
+        else
+            _tree "${st%/}" "$s/Kvantum/$kname"
+        fi
+    done
+    for st in "$_src/wallpapers"/*/; do
+        [[ -d $st ]] && _tree "${st%/}" "$s/wallpapers/$(basename "$st")"
+    done
+
+    # --- desktop / panel widgets (Material Clock, Panel Colorizer, ...) ----
+    for st in "$_src/plasmoids"/*/; do
+        [[ -f $st/metadata.json ]] && _tree "${st%/}" "$s/plasma/plasmoids/$(basename "$st")"
+    done
+
+    # --- Konsole profile + colour scheme -----------------------------------
+    if [[ -d $_src/Konsole ]]; then
+        local cs prof name
+        for cs in "$_src/Konsole"/*.colorscheme; do
+            [[ -f $cs ]] || continue
+            name=$(basename "$cs" .colorscheme)
+            # "New Color Scheme" is Konsole's placeholder name -> ClearSky
+            if [[ $name == "New Color Scheme" ]]; then
+                install -Dm644 "$cs" "$s/konsole/ClearSky.colorscheme"
+            else
+                install -Dm644 "$cs" "$s/konsole/$name.colorscheme"
+            fi
+        done
+        for prof in "$_src/Konsole"/*.profile; do
+            [[ -f $prof ]] || continue
+            install -Dm644 "$prof" "$s/konsole/$(basename "$prof")"
+            sed -i 's|^ColorScheme=New Color Scheme$|ColorScheme=ClearSky|' "$s/konsole/$(basename "$prof")"
+        done
+    fi
+
+    # --- cursors -----------------------------------------------------------
+    if _tree "$_src/aosp-cursors" "$s/icons/aosp-cursors"; then
+        grep -q '^Inherits=' "$s/icons/aosp-cursors/index.theme" ||
+            printf 'Inherits=breeze_cursors\n' >>"$s/icons/aosp-cursors/index.theme"
+        [[ -f $_src/aosp-cursors/NOTICE ]] &&
+            install -Dm644 "$_src/aosp-cursors/NOTICE" "$pkgdir/usr/share/licenses/$pkgname/aosp-cursors.NOTICE"
+    fi
+
+    true
+}

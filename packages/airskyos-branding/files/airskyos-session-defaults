@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# AirSkyOS login helper.
+#
+# All AirSkyOS defaults are installed system-wide (/etc/xdg, /usr/share).
+# This helper only handles what KDE cannot do from system config.
+#
+# Design vs. layout
+#   Design  (colours, Plasma style, window decoration, cursor, icons, splash)
+#           is (re)applied whenever /usr/share/airskyos/kde-defaults-revision
+#           changes, so an AirSkyOS update can ship a new look.
+#   Layout  (panels, widgets, their positions) and the wallpaper are applied
+#           ONCE, on a user's very first login. After that they belong to the
+#           user and are never touched again automatically.
+#
+#   airskyos-apply-theme            re-apply the design now (layout kept)
+#   airskyos-apply-theme --layout   also reset panels/widgets/wallpaper
+#                                   to the AirSkyOS default layout
+
+set -u
+
+CONF=/etc/airskyos/branding.conf
+DATA=/usr/share/airskyos
+APPLY_KDE_DEFAULTS=1
+LOOKANDFEEL="ClearSky"
+APPLY_LAYOUT_ON_FIRST_LOGIN=1
+# shellcheck source=/dev/null
+[[ -r $CONF ]] && . "$CONF"
+
+force=0
+reset_layout=0
+for arg in "$@"; do
+    case "$arg" in
+        --force)  force=1 ;;
+        --layout) force=1; reset_layout=1 ;;
+        -h|--help)
+            sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0 ;;
+    esac
+done
+
+CFG=${XDG_CONFIG_HOME:-$HOME/.config}
+STATE_DIR=${XDG_STATE_HOME:-$HOME/.local/state}/airskyos
+DESIGN_STAMP=$STATE_DIR/kde-defaults-revision
+LAYOUT_STAMP=$STATE_DIR/layout-applied
+
+log() { printf 'airskyos-session-defaults: %s\n' "$*"; }
+
+# CachyOS Hello is removed by the package; drop a user autostart copy too.
+rm -f -- "$CFG/autostart/cachyos-hello.desktop" 2>/dev/null
+
+# Renamed components (older AirSkyOS builds): carry the user's settings over.
+#   Kvantum theme  mac-tahoe-liquid-kde -> aozora-glass-kde
+#   KWin effect    liquidglass          -> aozoraglass
+migrate_names() {
+    local kv=$CFG/Kvantum/kvantum.kvconfig kw=$CFG/kwinrc changed=0
+    if grep -qs '^theme=mac-tahoe-liquid-kde' "$kv"; then
+        sed -i 's|^theme=mac-tahoe-liquid-kde|theme=aozora-glass-kde|' "$kv"
+    fi
+    if [[ -f $kw ]] && grep -q 'liquidglass' "$kw"; then
+        if ! grep -q '^\[Effect-aozoraglass\]' "$kw"; then
+            sed -i 's|^\[Effect-liquidglass\]|[Effect-aozoraglass]|' "$kw"
+        fi
+        grep -q '^aozoraglassEnabled=' "$kw" ||
+            sed -i 's|^liquidglassEnabled=|aozoraglassEnabled=|' "$kw"
+        sed -i '/^liquidglassEnabled=/d' "$kw"
+        changed=1
+    fi
+    [[ $changed == 1 ]] && dbus-send --session --type=signal /KWin org.kde.KWin.reloadConfig >/dev/null 2>&1
+    return 0
+}
+migrate_names
+
+[[ $APPLY_KDE_DEFAULTS == 1 || $force == 1 ]] || exit 0
+
+revision=$(cat "$DATA/kde-defaults-revision" 2>/dev/null || echo 1)
+applied=$(cat "$DESIGN_STAMP" 2>/dev/null || true)
+
+# A brand-new user: no AirSkyOS stamp at all (existing users of older
+# AirSkyOS builds already have the design stamp and keep their layout).
+new_user=0
+[[ -z $applied && ! -e $LAYOUT_STAMP ]] && new_user=1
+if [[ $new_user == 1 && $APPLY_LAYOUT_ON_FIRST_LOGIN == 1 ]]; then
+    reset_layout=1
+fi
+
+[[ $force == 0 && $reset_layout == 0 && $applied == "$revision" ]] && exit 0
+
+# Theme files come from the separately built airskyos-kde-theme package.
+if [[ ! -d /usr/share/plasma/look-and-feel/$LOOKANDFEEL ]]; then
+    log "\"$LOOKANDFEEL\" is not installed yet (airskyos-kde-theme)"
+    exit 0
+fi
+
+KREAD=$(command -v kreadconfig6 || command -v kreadconfig5 || echo false)
+
+# --- which global theme ---------------------------------------------------
+current=$("$KREAD" --file kdeglobals --group KDE --key LookAndFeelPackage 2>/dev/null)
+case "$current" in
+    ClearSky|"ClearSky Dark") target=$current ;;   # keep the user's light/dark choice
+    *)
+        if [[ $new_user == 1 || $force == 1 ]]; then
+            target=$LOOKANDFEEL
+        else
+            target=""   # the user picked another theme on purpose
+        fi
+        ;;
+esac
+
+# --- apply ----------------------------------------------------------------
+wait_for_plasmashell() {
+    local i
+    for i in $(seq 1 30); do
+        dbus-send --session --print-reply --dest=org.freedesktop.DBus / \
+            org.freedesktop.DBus.NameHasOwner string:org.kde.plasmashell 2>/dev/null |
+            grep -q 'boolean true' && return 0
+        sleep 1
+    done
+    return 1
+}
+
+if [[ -n $target ]] && command -v plasma-apply-lookandfeel >/dev/null 2>&1; then
+    if [[ $reset_layout == 1 ]]; then
+        # the layout script is run by plasmashell, so it has to be up
+        wait_for_plasmashell || log "plasmashell did not start in time"
+        log "applying look and feel + default layout: $target"
+        if plasma-apply-lookandfeel --apply "$target" --resetLayout >/dev/null 2>&1; then
+            mkdir -p "$STATE_DIR"
+            date -Is >"$LAYOUT_STAMP"
+        else
+            log "layout could not be applied, keeping the current one"
+            plasma-apply-lookandfeel --apply "$target" >/dev/null 2>&1
+        fi
+    else
+        log "applying look and feel (layout and wallpaper kept): $target"
+        plasma-apply-lookandfeel --apply "$target" >/dev/null 2>&1 || log "plasma-apply-lookandfeel failed"
+    fi
+elif [[ $reset_layout == 1 ]]; then
+    # user is on another theme but asked for the AirSkyOS layout anyway
+    mkdir -p "$STATE_DIR"; date -Is >"$LAYOUT_STAMP"
+fi
+
+# --- Kvantum (it only reads the per-user config) ------------------------
+kv=$CFG/Kvantum/kvantum.kvconfig
+if [[ $force == 1 ]] || ! grep -qs '^theme=.\+' "$kv"; then
+    mkdir -p "$CFG/Kvantum"
+    if grep -qs '^theme=' "$kv"; then
+        sed -i 's|^theme=.*|theme=aozora-glass-kde|' "$kv"
+    else
+        printf '[General]\ntheme=aozora-glass-kde\n' >>"$kv"
+    fi
+fi
+
+dbus-send --session --type=signal /KWin org.kde.KWin.reloadConfig >/dev/null 2>&1 || true
+
+mkdir -p "$STATE_DIR"
+printf '%s\n' "$revision" >"$DESIGN_STAMP"
+exit 0

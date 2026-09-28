@@ -1,0 +1,146 @@
+# Maintainer: Aozora <aozora9200@gmail.com>
+#
+# AirSkyOS branding for CachyOS (Arch Linux / KDE Plasma 6)
+#
+# This PKGBUILD contains no large theme files. The KDE theme files are packaged
+# separately by ../airskyos-kde-theme (you drop your Airsky folder in there).
+#
+# Build:    makepkg -sf
+# Install:  sudo pacman -U airskyos-*.pkg.tar.zst
+
+pkgbase=airskyos-branding
+pkgname=(airskyos-branding
+         airskyos-release
+         airskyos-plymouth-theme
+         airskyos-kde-settings
+         airskyos-kwin-glass)
+pkgver=2026.09.24
+pkgrel=10
+arch=('any')
+url="https://github.com/aozora9200/AirSkyOS"
+license=('GPL-3.0-or-later' 'CC-BY-SA-4.0' 'LicenseRef-AirSkyOS-Logo')
+source=()
+_assets="$startdir/assets"
+_files="$startdir/files"
+
+_install_tree() {
+    local src=$1 dst=$2
+    install -d "$dst"
+    cp -r --no-preserve=mode,ownership "$src/." "$dst/"
+    find "$dst" -type d -exec chmod 755 {} +
+    find "$dst" -type f -exec chmod 644 {} +
+}
+
+package_airskyos-branding() {
+    pkgdesc="AirSkyOS branding (meta package)"
+    depends=(airskyos-release airskyos-plymouth-theme airskyos-kde-settings airskyos-kwin-glass)
+    optdepends=('airskyos-kde-theme: ClearSky theme files (build from ../airskyos-kde-theme)')
+}
+
+package_airskyos-release() {
+    pkgdesc="AirSkyOS os-release, logo and pacman hooks that keep them after updates"
+    depends=(bash sed coreutils diffutils)
+    # AirSkyOS replaces the CachyOS welcome app
+    conflicts=(cachyos-hello cachyos-hello-git)
+    backup=(etc/airskyos/branding.conf etc/airskyos/limine-theme.conf etc/limine-entry-tool.d/50-airskyos.conf)
+    install=airskyos-release.install
+
+    install -Dm644 "$_assets/os-release"       "$pkgdir/usr/share/airskyos/os-release"
+    install -Dm644 "$_files/branding.conf"     "$pkgdir/etc/airskyos/branding.conf"
+    install -Dm755 "$_files/airskyos-branding" "$pkgdir/usr/share/libalpm/scripts/airskyos-branding"
+    install -Dm644 "$_files/zz-airskyos-release.hook"  "$pkgdir/usr/share/libalpm/hooks/zz-airskyos-release.hook"
+    install -Dm644 "$_files/zz-airskyos-plymouth.hook" "$pkgdir/usr/share/libalpm/hooks/zz-airskyos-plymouth.hook"
+
+    # Limine boot menu: AirSkyOS name, theme and splash that survive updates
+    install -Dm755 "$_files/airskyos-limine"          "$pkgdir/usr/share/libalpm/scripts/airskyos-limine"
+    install -Dm644 "$_files/zz-airskyos-limine.hook"  "$pkgdir/usr/share/libalpm/hooks/zz-airskyos-limine.hook"
+    install -Dm644 "$_files/limine-theme.conf"        "$pkgdir/etc/airskyos/limine-theme.conf"
+    install -Dm644 "$_files/50-airskyos.conf"         "$pkgdir/etc/limine-entry-tool.d/50-airskyos.conf"
+    install -Dm644 "$_assets/limine/airskyos-splash.jpg" "$pkgdir/usr/share/airskyos/limine/airskyos-splash.jpg"
+    install -d "$pkgdir/usr/bin"
+    ln -s ../share/libalpm/scripts/airskyos-limine "$pkgdir/usr/bin/airskyos-limine"
+
+    # LOGO=AirSky-logo in os-release -> icon name used by KInfoCenter etc.
+    install -Dm644 "$_assets/AirSky-logo.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/AirSky-logo.svg"
+    install -Dm644 "$_assets/AirSky-logo.svg" "$pkgdir/usr/share/pixmaps/AirSky-logo.svg"
+
+    # credits / licenses of everything AirSkyOS ships
+    install -Dm644 "$_files/NOTICE.md" "$pkgdir/usr/share/doc/airskyos/NOTICE.md"
+    install -d "$pkgdir/usr/share/licenses/airskyos"
+    ln -s ../../doc/airskyos/NOTICE.md "$pkgdir/usr/share/licenses/airskyos/NOTICE.md"
+    install -Dm644 "$_files/LICENSE.logo" "$pkgdir/usr/share/licenses/airskyos/LICENSE.logo"
+}
+
+package_airskyos-plymouth-theme() {
+    pkgdesc="AirSkyOS boot animation (Plymouth theme)"
+    depends=(plymouth airskyos-release)
+    install=airskyos-plymouth-theme.install
+
+    local _t="$pkgdir/usr/share/plymouth/themes/airsky-bootanimation"
+    _install_tree "$_assets/plymouth/airsky-bootanimation" "$_t"
+    # keymap-render.png offsets depend on the plymouth build (same as CachyOS)
+    if [[ -f /usr/share/plymouth/themes/spinner/keymap-render.png ]]; then
+        install -m644 /usr/share/plymouth/themes/spinner/keymap-render.png "$_t/keymap-render.png"
+    fi
+}
+
+package_airskyos-kde-settings() {
+    pkgdesc="AirSkyOS system-wide KDE defaults (ClearSky, KWin, lock screen, Konsole, cursor, fastfetch)"
+    depends=(plasma-workspace kconfig dbus airskyos-release fontconfig noto-fonts noto-fonts-cjk)
+    optdepends=('airskyos-kde-theme: the ClearSky theme files these defaults point to'
+                'kvantum: Kvantum widget style used by ClearSky'
+                'fastfetch: AirSkyOS logo when a terminal starts')
+    backup=(etc/xdg/kdeglobals etc/xdg/kwinrc etc/xdg/kwinrulesrc etc/xdg/kcminputrc
+            etc/xdg/plasmarc etc/xdg/ksplashrc etc/xdg/kscreenlockerrc etc/xdg/konsolerc
+            etc/xdg/Kvantum/kvantum.kvconfig etc/xdg/fastfetch/config.jsonc)
+
+    # system-wide defaults (users' own ~/.config values still take precedence)
+    local f
+    for f in kdeglobals kwinrc kwinrulesrc kcminputrc plasmarc ksplashrc kscreenlockerrc konsolerc; do
+        install -Dm644 "$_files/xdg/$f" "$pkgdir/etc/xdg/$f"
+    done
+    install -Dm644 "$_files/xdg/Kvantum/kvantum.kvconfig" "$pkgdir/etc/xdg/Kvantum/kvantum.kvconfig"
+
+    # Japanese text in a gothic font (Noto Sans CJK JP) instead of Mincho/Sung
+    install -Dm644 "$_files/fonts/64-airskyos-cjk.conf" "$pkgdir/usr/share/fontconfig/conf.avail/64-airskyos-cjk.conf"
+    install -d "$pkgdir/etc/fonts/conf.d"
+    ln -s /usr/share/fontconfig/conf.avail/64-airskyos-cjk.conf "$pkgdir/etc/fonts/conf.d/64-airskyos-cjk.conf"
+
+    # application launcher icons: aozora1.png = light theme, aozora.png = dark theme
+    install -Dm644 "$_assets/launcher/aozora1.png" "$pkgdir/usr/share/airskyos/aozora1.png"
+    install -Dm644 "$_assets/launcher/aozora.png"  "$pkgdir/usr/share/airskyos/aozora.png"
+
+    # terminal start-up screen (CachyOS fish runs fastfetch as its greeting)
+    install -Dm644 "$_files/fastfetch/config.jsonc" "$pkgdir/etc/xdg/fastfetch/config.jsonc"
+    install -Dm644 "$_files/fastfetch/logo.txt"     "$pkgdir/usr/share/airskyos/fastfetch/logo.txt"
+
+    # login helper: applies the global theme once over CachyOS's /etc/skel
+    install -Dm755 "$_files/airskyos-session-defaults" "$pkgdir/usr/lib/airskyos/airskyos-session-defaults"
+    install -Dm644 "$_files/airskyos-session-defaults.desktop" "$pkgdir/etc/xdg/autostart/airskyos-session-defaults.desktop"
+    install -Dm644 "$_files/kde-defaults-revision" "$pkgdir/usr/share/airskyos/kde-defaults-revision"
+    install -d "$pkgdir/usr/bin"
+    printf '#!/bin/sh\nexec /usr/lib/airskyos/airskyos-session-defaults --force "$@"\n' \
+        >"$pkgdir/usr/bin/airskyos-apply-theme"
+    chmod 755 "$pkgdir/usr/bin/airskyos-apply-theme"
+}
+
+package_airskyos-kwin-glass() {
+    pkgdesc="Aozora Glass KWin effect (blur + rounded corners), rebuilt automatically on every KWin update"
+    # build tools stay installed so the pacman hook can rebuild after kwin upgrades
+    depends=(kwin kdecoration qt6-base qt6-tools
+             kconfig kconfigwidgets kcoreaddons kcrash kglobalaccel ki18n kio
+             knotifications kservice kwidgetsaddons kwindowsystem kguiaddons kcmutils
+             libepoxy libx11 libxcb
+             cmake extra-cmake-modules gcc make pacman)
+    install=airskyos-kwin-glass.install
+
+    _install_tree "$_assets/acrylic-glass" "$pkgdir/usr/src/airskyos-kwin-glass"
+    echo "$pkgver-$pkgrel" >"$pkgdir/usr/src/airskyos-kwin-glass/.version"
+    # record of the AirSkyOS change (window corner clipping) for GPL compliance
+    install -Dm644 "$_files/acrylic-glass-round-content.patch" "$pkgdir/usr/src/airskyos-kwin-glass/AIRSKYOS-CHANGES.patch"
+    install -Dm755 "$_files/airskyos-kwin-glass-build" "$pkgdir/usr/lib/airskyos/airskyos-kwin-glass-build"
+    install -Dm644 "$_files/zz-airskyos-kwin-glass.hook" "$pkgdir/usr/share/libalpm/hooks/zz-airskyos-kwin-glass.hook"
+    install -d "$pkgdir/usr/bin"
+    ln -s ../lib/airskyos/airskyos-kwin-glass-build "$pkgdir/usr/bin/airskyos-kwin-glass-build"
+    install -Dm644 "$_assets/acrylic-glass/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

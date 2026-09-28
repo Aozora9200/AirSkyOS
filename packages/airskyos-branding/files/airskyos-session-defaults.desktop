@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=AirSkyOS session defaults
+Comment=Apply AirSkyOS look and feel once per user
+Exec=/usr/lib/airskyos/airskyos-session-defaults
+OnlyShowIn=KDE;
+NoDisplay=true

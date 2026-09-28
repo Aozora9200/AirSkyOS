@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f6fe0"/>
+      <stop offset="0.6" stop-color="#4ea8f5"/>
+      <stop offset="1" stop-color="#bfe6ff"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.7" cy="0.3" r="0.4">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="0.3" stop-color="#fff6d8" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.75"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="116" fill="url(#sky)"/>
+  <circle cx="128" cy="128" r="116" fill="url(#sun)"/>
+  <!-- cloud (circle内に収まる形) -->
+  <path fill="#ffffff" fill-opacity="0.97"
+    d="M74 182c-16 0-28-12-28-26s11-25 26-26c4-20 20-34 41-34 18 0 32 10 38 25 4-1 8-2 12-2 18 0 33 14 33 32 12 3 20 13 20 24 0 4-1 6-2 7z"/>
+  <!-- 光沢 -->
+  <path fill="url(#gloss)" d="M30 110a98 70 0 0 1 196 0c-30-30-166-30-196 0z"/>
+  <circle cx="128" cy="128" r="115" fill="none" stroke="url(#rim)" stroke-width="3"/>
+</svg>

@@ -1,0 +1,13 @@
+# remove from airootfs!
+# ISO build only: turn the installer into the AirSkyOS installer
+# (the same script runs again every time "Install AirSkyOS" is started).
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Target = *
+
+[Action]
+Description = [AirSkyOS ISO] Setting up the AirSkyOS installer...
+When = PostTransaction
+Exec = /usr/local/bin/airskyos-installer-setup

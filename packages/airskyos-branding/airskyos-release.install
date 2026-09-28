@@ -1,0 +1,6 @@
+post_remove() {
+    # Hand branding back to CachyOS
+    if [ -x /usr/share/libalpm/scripts/cachyos-branding ]; then
+        /usr/share/libalpm/scripts/cachyos-branding
+    fi
+}

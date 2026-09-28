@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Welcome to AirSkyOS
+Name[ja]=AirSkyOS へようこそ
+Comment=Get started with AirSkyOS
+Comment[ja]=AirSkyOS の紹介・システム更新・おすすめアプリの導入
+Exec=airskyos-welcome
+Icon=airskyos-welcome
+Terminal=false
+Categories=System;Settings;
+Keywords=welcome;update;install;ようこそ;更新;
+StartupNotify=true

@@ -1,0 +1,12 @@
+# remove from airootfs!
+# ISO build only: make sure the installer can actually start.
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Target = *
+
+[Action]
+Description = [AirSkyOS ISO] Checking that the installer's libraries are present...
+When = PostTransaction
+Exec = /etc/pacman.d/hooks/airskyos-iso-check.sh

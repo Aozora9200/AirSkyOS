@@ -1,0 +1,685 @@
+diff -ruN a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt	2026-09-26 23:10:10.494818354 +0900
++++ b/CMakeLists.txt	2026-09-26 23:10:10.497120189 +0900
+@@ -16,7 +16,7 @@
+ set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
+ set(CPACK_PACKAGE_FILE_NAME "kwin-acrylic-glass")
+ set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Acrylic Glass — blur and rounded corners for KDE Plasma 6 (MacTahoe Liquid KDE)")
++set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Aozora Glass — blur and rounded corners for KDE Plasma 6")
+ include(CPack)
+ 
+ if(NOT CMAKE_BUILD_TYPE)
+@@ -27,8 +27,8 @@
+ find_package(ECM REQUIRED NO_MODULE)
+ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${ECM_MODULE_PATH} ${ECM_KDE_MODULE_DIR})
+ 
+-option(GLASS_WAYLAND "Whether to build Acrylic Glass for Wayland if present." ON)
+-option(GLASS_X11 "Whether to build Acrylic Glass for X11 if present." OFF)
++option(GLASS_WAYLAND "Whether to build Aozora Glass for Wayland if present." ON)
++option(GLASS_X11 "Whether to build Aozora Glass for X11 if present." OFF)
+ 
+ include(FeatureSummary)
+ include(KDEInstallDirs)
+@@ -96,7 +96,7 @@
+ 
+ if(NOT GLASS_WAYLAND AND NOT GLASS_X11)
+     message(FATAL_ERROR
+-        "Acrylic Glass requires KWin development files for Wayland or X11. "
++        "Aozora Glass requires KWin development files for Wayland or X11. "
+         "Install the missing KWin dependencies and re-run."
+     )
+ endif()
+@@ -106,7 +106,7 @@
+     # signature from 6.5.80 onward (RenderView* first arg), and the
+     # plasmoids link against Plasma 6.6+ headers. The installer preflight
+     # enforces the same 6.6 minimum at runtime.
+-    message(FATAL_ERROR "Acrylic Glass requires KDE Plasma 6.6+ (found ${KWin_VERSION}).")
++    message(FATAL_ERROR "Aozora Glass requires KDE Plasma 6.6+ (found ${KWin_VERSION}).")
+ endif()
+ 
+ # KWin's private effect ABI changed at 6.7 (the proprietary blur
+@@ -134,7 +134,7 @@
+         set(GLASS_KWIN_67_X11 ON)
+     endif()
+ endif()
+-message(STATUS "Acrylic Glass: KWin ${KWin_VERSION} (6.7 ABI: Wayland=${GLASS_KWIN_67_WAYLAND} X11=${GLASS_KWIN_67_X11})")
++message(STATUS "Aozora Glass: KWin ${KWin_VERSION} (6.7 ABI: Wayland=${GLASS_KWIN_67_WAYLAND} X11=${GLASS_KWIN_67_X11})")
+ 
+ find_package(KDecoration3 REQUIRED)
+ 
+diff -ruN a/src/CMakeLists.txt b/src/CMakeLists.txt
+--- a/src/CMakeLists.txt	2026-09-26 23:10:10.494486458 +0900
++++ b/src/CMakeLists.txt	2026-09-26 23:10:10.496678223 +0900
+@@ -2,7 +2,7 @@
+     add_subdirectory(kcm)
+ endif()
+ 
+-set(LIQUIDGLASS_SHADER_INCLUDES
++set(AOZORAGLASS_SHADER_INCLUDES
+     sdf.glsl
+     blur.glsl
+     distort.glsl
+@@ -11,7 +11,7 @@
+ 
+ function(preprocess_shader_includes input output)
+     file(READ "${input}" SHADER_SOURCE)
+-    foreach(include_file IN LISTS LIQUIDGLASS_SHADER_INCLUDES)
++    foreach(include_file IN LISTS AOZORAGLASS_SHADER_INCLUDES)
+         file(READ "shaders/${include_file}" INCLUDE_SOURCE)
+         string(REPLACE "#include \"${include_file}\"" "${INCLUDE_SOURCE}" SHADER_SOURCE "${SHADER_SOURCE}")
+     endforeach()
+@@ -21,40 +21,40 @@
+ preprocess_shader_includes(shaders/glass.glsl shaders/glass.frag)
+ preprocess_shader_includes(shaders/glass_core.glsl shaders/glass_core.frag)
+ 
+-set(liquidglass_SOURCES
++set(aozoraglass_SOURCES
+     effect.cpp
+-    liquidglass.qrc
++    aozoraglass.qrc
+     main.cpp
+ )
+ 
+-kconfig_add_kcfg_files(liquidglass_SOURCES
++kconfig_add_kcfg_files(aozoraglass_SOURCES
+     glassconfig.kcfgc
+ )
+ 
+ if(GLASS_WAYLAND)
+-    add_library(liquidglass MODULE ${liquidglass_SOURCES})
+-    target_link_libraries(liquidglass PRIVATE
++    add_library(aozoraglass MODULE ${aozoraglass_SOURCES})
++    target_link_libraries(aozoraglass PRIVATE
+         KDecoration3::KDecoration
+         KF6::ConfigGui
+         KWin::kwin
+     )
+     # GLASS_KWIN_67 drives the 6.6-vs-6.7 ABI gating in kwin_version_compat.h.
+     if(GLASS_KWIN_67_WAYLAND)
+-        target_compile_definitions(liquidglass PRIVATE GLASS_KWIN_67)
++        target_compile_definitions(aozoraglass PRIVATE GLASS_KWIN_67)
+     endif()
+-    install(TARGETS liquidglass DESTINATION ${KDE_INSTALL_PLUGINDIR}/kwin/effects/plugins)
++    install(TARGETS aozoraglass DESTINATION ${KDE_INSTALL_PLUGINDIR}/kwin/effects/plugins)
+ endif()
+ if(GLASS_X11)
+-    add_library(liquidglass_x11 MODULE ${liquidglass_SOURCES})
+-    target_link_libraries(liquidglass_x11 PRIVATE
++    add_library(aozoraglass_x11 MODULE ${aozoraglass_SOURCES})
++    target_link_libraries(aozoraglass_x11 PRIVATE
+         KDecoration3::KDecoration
+         KF6::ConfigGui
+         KWinX11::kwin
+         XCB::XCB
+     )
+-    target_compile_definitions(liquidglass_x11 PRIVATE GLASS_X11)
++    target_compile_definitions(aozoraglass_x11 PRIVATE GLASS_X11)
+     if(GLASS_KWIN_67_X11)
+-        target_compile_definitions(liquidglass_x11 PRIVATE GLASS_KWIN_67)
++        target_compile_definitions(aozoraglass_x11 PRIVATE GLASS_KWIN_67)
+     endif()
+-    install(TARGETS liquidglass_x11 DESTINATION ${KDE_INSTALL_PLUGINDIR}/kwin-x11/effects/plugins)
++    install(TARGETS aozoraglass_x11 DESTINATION ${KDE_INSTALL_PLUGINDIR}/kwin-x11/effects/plugins)
+ endif()
+diff -ruN a/src/aozoraglass.qrc b/src/aozoraglass.qrc
+--- a/src/aozoraglass.qrc	1970-01-01 09:00:00.000000000 +0900
++++ b/src/aozoraglass.qrc	2026-09-26 23:10:10.496770254 +0900
+@@ -0,0 +1,20 @@
++<!DOCTYPE RCC><RCC version="1.0">
++<qresource prefix="/effects/aozoraglass/">
++  <file>shaders/downsample.frag</file>
++  <file>shaders/downsample_core.frag</file>
++  <file>shaders/noise.frag</file>
++  <file>shaders/noise_core.frag</file>
++  <file>shaders/glass_core.frag</file>
++  <file>shaders/glass.frag</file>
++  <file>shaders/glass_core.vert</file>
++  <file>shaders/glass.vert</file>
++  <file>shaders/upsample.frag</file>
++  <file>shaders/upsample_core.frag</file>
++  <file>shaders/vertex.vert</file>
++  <file>shaders/vertex_core.vert</file>
++  <file>shaders/sdf.glsl</file>
++  <file>shaders/blur.glsl</file>
++  <file>shaders/distort.glsl</file>
++  <file>shaders/highlight.glsl</file>
++</qresource>
++</RCC>
+diff -ruN a/src/effect.cpp b/src/effect.cpp
+--- a/src/effect.cpp	2026-09-26 23:10:10.494270120 +0900
++++ b/src/effect.cpp	2026-09-26 23:10:10.496693474 +0900
+@@ -51,15 +51,15 @@
+ 
+ #include <KDecoration3/Decoration>
+ 
+-Q_LOGGING_CATEGORY(KWIN_BLUR, "kwin_effect_liquidglass", QtWarningMsg)
++Q_LOGGING_CATEGORY(KWIN_BLUR, "kwin_effect_aozoraglass", QtWarningMsg)
+ 
+ // File-scope helpers
+ 
+ /// One-shot Qt resource initialiser. Called from the constructor so the
+-/// :/effects/liquidglass/* paths resolve at runtime.
++/// :/effects/aozoraglass/* paths resolve at runtime.
+ static void ensureResources()
+ {
+-    Q_INIT_RESOURCE(liquidglass);
++    Q_INIT_RESOURCE(aozoraglass);
+ }
+ 
+ namespace KWin {
+@@ -134,7 +134,7 @@
+ 
+     // Onscreen pass: SDF + drift + lens + rim, the user-facing surface
+     m_roundedOnscreenPass.shader = ShaderManager::instance()->generateShaderFromFile(
+-        ShaderTrait::MapTexture, QStringLiteral(":/effects/liquidglass/shaders/glass.vert"), QStringLiteral(":/effects/liquidglass/shaders/glass.frag"));
++        ShaderTrait::MapTexture, QStringLiteral(":/effects/aozoraglass/shaders/glass.vert"), QStringLiteral(":/effects/aozoraglass/shaders/glass.frag"));
+     if (!m_roundedOnscreenPass.shader) {
+         qCWarning(KWIN_BLUR) << "Failed to load onscreen pass shader (null)";
+         return;
+@@ -170,7 +170,7 @@
+ 
+     // Dual Kawase downsample pass
+     m_downsamplePass.shader = ShaderManager::instance()->generateShaderFromFile(
+-        ShaderTrait::MapTexture, QStringLiteral(":/effects/liquidglass/shaders/vertex.vert"), QStringLiteral(":/effects/liquidglass/shaders/downsample.frag"));
++        ShaderTrait::MapTexture, QStringLiteral(":/effects/aozoraglass/shaders/vertex.vert"), QStringLiteral(":/effects/aozoraglass/shaders/downsample.frag"));
+     if (!m_downsamplePass.shader) {
+         qCWarning(KWIN_BLUR) << "Failed to load downsampling pass shader";
+         return;
+@@ -182,7 +182,7 @@
+ 
+     // Dual Kawase upsample pass
+     m_upsamplePass.shader = ShaderManager::instance()->generateShaderFromFile(
+-        ShaderTrait::MapTexture, QStringLiteral(":/effects/liquidglass/shaders/vertex.vert"), QStringLiteral(":/effects/liquidglass/shaders/upsample.frag"));
++        ShaderTrait::MapTexture, QStringLiteral(":/effects/aozoraglass/shaders/vertex.vert"), QStringLiteral(":/effects/aozoraglass/shaders/upsample.frag"));
+     if (!m_upsamplePass.shader) {
+         qCWarning(KWIN_BLUR) << "Failed to load upsampling pass shader";
+         return;
+@@ -194,7 +194,7 @@
+ 
+     // Noise pass (grain over the blurred result)
+     m_noisePass.shader = ShaderManager::instance()->generateShaderFromFile(
+-        ShaderTrait::MapTexture, QStringLiteral(":/effects/liquidglass/shaders/vertex.vert"), QStringLiteral(":/effects/liquidglass/shaders/noise.frag"));
++        ShaderTrait::MapTexture, QStringLiteral(":/effects/aozoraglass/shaders/vertex.vert"), QStringLiteral(":/effects/aozoraglass/shaders/noise.frag"));
+     if (!m_noisePass.shader) {
+         qCWarning(KWIN_BLUR) << "Failed to load noise pass shader";
+         return;
+@@ -283,6 +283,14 @@
+ /// capability flag is just dropped from the shared manager.
+ BlurEffect::~BlurEffect()
+ {
++    // AirSkyOS: hand the corner clipping back to the decoration.
++    if (effects) {
++        const auto windows = effects->stackingOrder();
++        for (EffectWindow* w : windows) {
++            resetContentCorners(w);
++        }
++    }
++
+ #if ACRYLIC_GLASS_KWIN_6_7
+     if (waylandServer()) {
+         waylandServer()->backgroundEffectManager()->removeBlurCapability();
+@@ -737,6 +745,72 @@
+ 
+ // Per-frame entry points
+ 
++// ---------------------------------------------------------------------------
++// AirSkyOS: round the window itself, not just the glass behind it.
++//
++// Aurorae (SVG) decorations cannot declare a border radius, so KWin draws the
++// window with square corners while the glass underneath is rounded with
++// WindowCornerRadius -- the corners of the window stick out of the glass.
++// Give the window's scene item the same radius so KWin's renderer clips it:
++//   * KWin >= 6.7: the window container (decoration + client together)
++//   * KWin 6.6   : only the client surface, bottom corners (the transparent
++//                  title bar sits on top of the rounded glass there)
++// Applied every frame because KWin resets it when the surface is recreated.
++// Only server-side decorated normal windows/dialogs; CSD windows keep their
++// own shadows, and decorations that set a radius themselves (Breeze) win.
++// ---------------------------------------------------------------------------
++static Item* contentCornerItem(EffectWindow* w)
++{
++    WindowItem* item = w->windowItem();
++    if (!item) {
++        return nullptr;
++    }
++#if ACRYLIC_GLASS_KWIN_6_7
++    return item->windowContainer();
++#else
++    return item->surfaceItem();
++#endif
++}
++
++void BlurEffect::resetContentCorners(EffectWindow* w)
++{
++    if (Item* item = contentCornerItem(w); item && w->window()) {
++        item->setBorderRadius(w->window()->borderRadius());
++    }
++}
++
++void BlurEffect::updateContentCorners(EffectWindow* w)
++{
++    Item* item = contentCornerItem(w);
++    if (!item || !w->window()) {
++        return;
++    }
++
++    const BorderRadius native = w->window()->borderRadius();
++    const bool eligible = BlurConfig::clipWindowContent()
++        && native.isNull()
++        && w->decoration()
++        && (w->isNormalWindow() || w->isDialog())
++        && !w->isFullScreen();
++
++    BorderRadius radius = native;
++    if (eligible) {
++        const bool isMaximized = effects->clientArea(MaximizeArea, w).toRect() == w->frameGeometry().toRect();
++        if (!isMaximized || BlurConfig::roundCornersOfMaximizedWindows()) {
++            const QRectF frame = w->frameGeometry();
++            qreal r = std::min<qreal>(BlurConfig::windowCornerRadius(), std::min(frame.width(), frame.height()) / 2.0);
++#if ACRYLIC_GLASS_KWIN_6_7
++            radius = BorderRadius(r);
++#else
++            const qreal bottom = std::max<qreal>(0.0, r - w->decoration()->borders().bottom());
++            radius = BorderRadius(0, 0, bottom, bottom);
++#endif
++        }
++    }
++
++    item->setBorderRadius(radius); // no-op when unchanged
++}
++
+ /// Reset per-frame accumulators and remember which view we're painting
+ /// so prePaintWindow / blur can attribute their dirty regions correctly.
+ void BlurEffect::prePaintScreen(ScreenPrePaintData& data ACRYLIC_GLASS_PRESENT_TIME_PARAM)
+@@ -753,6 +827,7 @@
+ /// (= skip) the background behind our blur area as a perf optimisation.
+ void BlurEffect::prePaintWindow(RenderView* view, EffectWindow* w, WindowPrePaintData& data ACRYLIC_GLASS_PRESENT_TIME_PARAM)
+ {
++    updateContentCorners(w);
+     effects->prePaintWindow(view, w, data ACRYLIC_GLASS_PRESENT_TIME_ARG);
+ 
+ #if ACRYLIC_GLASS_KWIN_6_7
+diff -ruN a/src/effect.h b/src/effect.h
+--- a/src/effect.h	2026-09-26 23:10:10.494626943 +0900
++++ b/src/effect.h	2026-09-26 23:10:10.496589146 +0900
+@@ -84,7 +84,7 @@
+ // BlurEffect — Dual Kawase + rounded-rect SDF compositor
+ 
+ /**
+- * Acrylic Glass: macOS-Tahoe-styled blur effect for KWin.
++ * Aozora Glass: frosted blur effect for KWin.
+  *
+  * Pipeline per blurred window per frame:
+  *   1. Capture the pixels behind the window into framebuffers[0]
+@@ -142,6 +142,9 @@
+     /// Kawase expand size so taps near the edges don't sample stale
+     /// content from outside.
+     void prePaintWindow(RenderView* view, EffectWindow* w, WindowPrePaintData& data ACRYLIC_GLASS_PRESENT_TIME_PARAM) override;
++    // AirSkyOS: clip the window's own corners to the glass radius
++    void updateContentCorners(EffectWindow* w);
++    void resetContentCorners(EffectWindow* w);
+ 
+     /// The main entry point — KWin asks us to paint window ``w``; we
+     /// either delegate to ``blur()`` (when blur is wanted) or fall back
+diff -ruN a/src/glass.kcfg b/src/glass.kcfg
+--- a/src/glass.kcfg	2026-09-26 23:10:10.494144099 +0900
++++ b/src/glass.kcfg	2026-09-26 23:10:10.496666772 +0900
+@@ -4,7 +4,7 @@
+     xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+     http://www.kde.org/standards/kcfg/1.0/kcfg.xsd" >
+     <kcfgfile arg="true"/>
+-    <group name="Effect-liquidglass">
++    <group name="Effect-aozoraglass">
+         <entry name="AcrylicGlassType" type="Enum">
+             <choices>
+                 <choice name="Gaussian"/>
+@@ -40,6 +40,9 @@
+         <entry name="PopupCornerRadius" type="Double">
+             <default>6.0</default>
+         </entry>
++        <entry name="ClipWindowContent" type="Bool">
++            <default>true</default>
++        </entry>
+         <entry name="RoundCornersOfMaximizedWindows" type="Bool">
+             <default>false</default>
+         </entry>
+diff -ruN a/src/kcm/CMakeLists.txt b/src/kcm/CMakeLists.txt
+--- a/src/kcm/CMakeLists.txt	2026-09-26 23:10:10.492807222 +0900
++++ b/src/kcm/CMakeLists.txt	2026-09-26 23:10:10.496812702 +0900
+@@ -1,16 +1,16 @@
+-set(kwin_liquidglass_config_SRCS
++set(kwin_aozoraglass_config_SRCS
+     config.cpp
+     config.h
+ )
+ 
+-ki18n_wrap_ui(kwin_liquidglass_config_SRCS config.ui)
+-kconfig_add_kcfg_files(kwin_liquidglass_config_SRCS ../glassconfig.kcfgc)
++ki18n_wrap_ui(kwin_aozoraglass_config_SRCS config.ui)
++kconfig_add_kcfg_files(kwin_aozoraglass_config_SRCS ../glassconfig.kcfgc)
+ 
+ # This will only work as long as KWin and KWin X11 have the same interface
+-qt_add_dbus_interface(kwin_liquidglass_config_SRCS ${KWIN_EFFECTS_INTERFACE} kwineffects_interface)
++qt_add_dbus_interface(kwin_aozoraglass_config_SRCS ${KWIN_EFFECTS_INTERFACE} kwineffects_interface)
+ 
+-add_library(kwin_liquidglass_config MODULE ${kwin_liquidglass_config_SRCS})
+-target_link_libraries(kwin_liquidglass_config
++add_library(kwin_aozoraglass_config MODULE ${kwin_aozoraglass_config_SRCS})
++target_link_libraries(kwin_aozoraglass_config
+     KF6::KCMUtils
+     KF6::CoreAddons
+     KF6::I18n
+@@ -18,8 +18,8 @@
+ )
+ 
+ if(GLASS_WAYLAND)
+-    install(TARGETS kwin_liquidglass_config DESTINATION ${KDE_INSTALL_PLUGINDIR}/kwin/effects/configs)
++    install(TARGETS kwin_aozoraglass_config DESTINATION ${KDE_INSTALL_PLUGINDIR}/kwin/effects/configs)
+ endif()
+ if(GLASS_X11)
+-    install(TARGETS kwin_liquidglass_config DESTINATION ${KDE_INSTALL_PLUGINDIR}/kwin-x11/effects/configs)
++    install(TARGETS kwin_aozoraglass_config DESTINATION ${KDE_INSTALL_PLUGINDIR}/kwin-x11/effects/configs)
+ endif()
+diff -ruN a/src/kcm/config.cpp b/src/kcm/config.cpp
+--- a/src/kcm/config.cpp	2026-09-26 23:10:10.492753025 +0900
++++ b/src/kcm/config.cpp	2026-09-26 23:10:10.496799346 +0900
+@@ -10,9 +10,9 @@
+ 
+ namespace KWin {
+ 
+-K_PLUGIN_CLASS(LiquidGlassEffectConfig)
++K_PLUGIN_CLASS(AozoraGlassEffectConfig)
+ 
+-LiquidGlassEffectConfig::LiquidGlassEffectConfig(QObject* parent, const KPluginMetaData& data)
++AozoraGlassEffectConfig::AozoraGlassEffectConfig(QObject* parent, const KPluginMetaData& data)
+     : KCModule(parent, data)
+ {
+     ui.setupUi(widget());
+@@ -25,18 +25,18 @@
+     }
+ }
+ 
+-LiquidGlassEffectConfig::~LiquidGlassEffectConfig() { }
++AozoraGlassEffectConfig::~AozoraGlassEffectConfig() { }
+ 
+-void LiquidGlassEffectConfig::save()
++void AozoraGlassEffectConfig::save()
+ {
+     KCModule::save();
+ 
+     OrgKdeKwinEffectsInterface interface(QStringLiteral("org.kde.KWin"), QStringLiteral("/Effects"), QDBusConnection::sessionBus());
+ 
+     if (QGuiApplication::platformName() == QStringLiteral("xcb")) {
+-        interface.reconfigureEffect(QStringLiteral("liquidglass_x11"));
++        interface.reconfigureEffect(QStringLiteral("aozoraglass_x11"));
+     } else {
+-        interface.reconfigureEffect(QStringLiteral("liquidglass"));
++        interface.reconfigureEffect(QStringLiteral("aozoraglass"));
+     }
+ }
+ 
+diff -ruN a/src/kcm/config.h b/src/kcm/config.h
+--- a/src/kcm/config.h	2026-09-26 23:10:10.492371074 +0900
++++ b/src/kcm/config.h	2026-09-26 23:10:10.496843430 +0900
+@@ -12,13 +12,13 @@
+ 
+ namespace KWin {
+ 
+-class LiquidGlassEffectConfig : public KCModule
++class AozoraGlassEffectConfig : public KCModule
+ {
+     Q_OBJECT
+ 
+ public:
+-    explicit LiquidGlassEffectConfig(QObject* parent, const KPluginMetaData& data);
+-    ~LiquidGlassEffectConfig() override;
++    explicit AozoraGlassEffectConfig(QObject* parent, const KPluginMetaData& data);
++    ~AozoraGlassEffectConfig() override;
+ 
+     void save() override;
+ 
+diff -ruN a/src/kcm/config.ui b/src/kcm/config.ui
+--- a/src/kcm/config.ui	2026-09-26 23:10:10.492871360 +0900
++++ b/src/kcm/config.ui	2026-09-26 23:10:10.496824437 +0900
+@@ -14,7 +14,7 @@
+    <item>
+     <widget class="QLabel" name="introLabel">
+      <property name="text">
+-      <string>Acrylic Glass — blur and rounded corners for KDE Plasma 6.</string>
++      <string>Aozora Glass — blur and rounded corners for KDE Plasma 6.</string>
+      </property>
+      <property name="wordWrap">
+       <bool>true</bool>
+diff -ruN a/src/kwin_version_compat.h b/src/kwin_version_compat.h
+--- a/src/kwin_version_compat.h	2026-09-26 23:10:10.494389664 +0900
++++ b/src/kwin_version_compat.h	2026-09-26 23:10:10.496655048 +0900
+@@ -7,7 +7,7 @@
+ #pragma once
+ 
+ /**
+- * KWin version gating for the Acrylic Glass effect.
++ * KWin version gating for the Aozora Glass effect.
+  *
+  * KWin's private effect ABI is not stable across feature releases, so
+  * the parts of this effect that touch it have to be compiled against the
+diff -ruN a/src/liquidglass.qrc b/src/liquidglass.qrc
+--- a/src/liquidglass.qrc	2026-09-26 23:10:10.494562773 +0900
++++ b/src/liquidglass.qrc	1970-01-01 09:00:00.000000000 +0900
+@@ -1,20 +0,0 @@
+-<!DOCTYPE RCC><RCC version="1.0">
+-<qresource prefix="/effects/liquidglass/">
+-  <file>shaders/downsample.frag</file>
+-  <file>shaders/downsample_core.frag</file>
+-  <file>shaders/noise.frag</file>
+-  <file>shaders/noise_core.frag</file>
+-  <file>shaders/glass_core.frag</file>
+-  <file>shaders/glass.frag</file>
+-  <file>shaders/glass_core.vert</file>
+-  <file>shaders/glass.vert</file>
+-  <file>shaders/upsample.frag</file>
+-  <file>shaders/upsample_core.frag</file>
+-  <file>shaders/vertex.vert</file>
+-  <file>shaders/vertex_core.vert</file>
+-  <file>shaders/sdf.glsl</file>
+-  <file>shaders/blur.glsl</file>
+-  <file>shaders/distort.glsl</file>
+-  <file>shaders/highlight.glsl</file>
+-</qresource>
+-</RCC>
+diff -ruN a/src/metadata.json b/src/metadata.json
+--- a/src/metadata.json	2026-09-26 23:10:10.494499434 +0900
++++ b/src/metadata.json	2026-09-26 23:10:10.496743042 +0900
+@@ -2,14 +2,14 @@
+     "KPlugin": {
+         "Authors": [
+             {
+-                "Name": "MacTahoe Liquid KDE"
++                "Name": "Lester Cordero Murillo, Aozora"
+             }
+         ],
+         "Category": "Appearance",
+-        "Description": "Acrylic Glass — blur and rounded corners for KDE Plasma 6.",
++        "Description": "Aozora Glass — blur and rounded corners for KDE Plasma 6.",
+         "EnabledByDefault": false,
+         "License": "GPL",
+-        "Name": "Acrylic Glass"
++        "Name": "Aozora Glass"
+     },
+-    "X-KDE-ConfigModule": "kwin_liquidglass_config"
++    "X-KDE-ConfigModule": "kwin_aozoraglass_config"
+ }
+diff -ruN a/src/shaders/blur.glsl b/src/shaders/blur.glsl
+--- a/src/shaders/blur.glsl	2026-09-26 23:10:10.494096527 +0900
++++ b/src/shaders/blur.glsl	2026-09-26 23:10:10.496919290 +0900
+@@ -1,7 +1,7 @@
+-// MacTahoe Liquid KDE — Acrylic Glass blur helpers
++// Aozora Glass — blur helpers
+ 
+-#ifndef LIQUIDGLASS_BLUR_GLSL
+-#define LIQUIDGLASS_BLUR_GLSL
++#ifndef AOZORAGLASS_BLUR_GLSL
++#define AOZORAGLASS_BLUR_GLSL
+ 
+ // Shared SAMPLES×SAMPLES tap grid used by every kernel below.
+ #define LG_BLUR_SAMPLES 9
+diff -ruN a/src/shaders/distort.glsl b/src/shaders/distort.glsl
+--- a/src/shaders/distort.glsl	2026-09-26 23:10:10.493863336 +0900
++++ b/src/shaders/distort.glsl	2026-09-26 23:10:10.496980232 +0900
+@@ -1,7 +1,7 @@
+-// MacTahoe Liquid KDE — Acrylic Glass lens + chromatic distortion helpers
++// Aozora Glass — lens + chromatic distortion helpers
+ 
+-#ifndef LIQUIDGLASS_DISTORT_GLSL
+-#define LIQUIDGLASS_DISTORT_GLSL
++#ifndef AOZORAGLASS_DISTORT_GLSL
++#define AOZORAGLASS_DISTORT_GLSL
+ 
+ vec2 lgLensUV(vec2 uv, float magnifyGlassStrength, float edgeQ)
+ {
+diff -ruN a/src/shaders/glass.frag b/src/shaders/glass.frag
+--- a/src/shaders/glass.frag	2026-09-26 23:10:10.493229875 +0900
++++ b/src/shaders/glass.frag	2026-09-26 23:10:10.497077262 +0900
+@@ -3,10 +3,10 @@
+ #define LG_SAMPLE(tex, coord) texture2D(tex, coord)
+ #define LG_OUT gl_FragColor
+ 
+-// MacTahoe Liquid KDE — Acrylic Glass SDF helpers
++// Aozora Glass — SDF helpers
+ 
+-#ifndef LIQUIDGLASS_SDF_GLSL
+-#define LIQUIDGLASS_SDF_GLSL
++#ifndef AOZORAGLASS_SDF_GLSL
++#define AOZORAGLASS_SDF_GLSL
+ 
+ uniform vec2 blurSize;
+ 
+@@ -35,10 +35,10 @@
+ 
+ #endif
+ 
+-// MacTahoe Liquid KDE — Acrylic Glass blur helpers
++// Aozora Glass — blur helpers
+ 
+-#ifndef LIQUIDGLASS_BLUR_GLSL
+-#define LIQUIDGLASS_BLUR_GLSL
++#ifndef AOZORAGLASS_BLUR_GLSL
++#define AOZORAGLASS_BLUR_GLSL
+ 
+ // Shared SAMPLES×SAMPLES tap grid used by every kernel below.
+ #define LG_BLUR_SAMPLES 9
+@@ -129,10 +129,10 @@
+ 
+ #endif
+ 
+-// MacTahoe Liquid KDE — Acrylic Glass lens + chromatic distortion helpers
++// Aozora Glass — lens + chromatic distortion helpers
+ 
+-#ifndef LIQUIDGLASS_DISTORT_GLSL
+-#define LIQUIDGLASS_DISTORT_GLSL
++#ifndef AOZORAGLASS_DISTORT_GLSL
++#define AOZORAGLASS_DISTORT_GLSL
+ 
+ vec2 lgLensUV(vec2 uv, float magnifyGlassStrength, float edgeQ)
+ {
+@@ -175,10 +175,10 @@
+ 
+ #endif
+ 
+-// MacTahoe Liquid KDE — Acrylic Glass highlight helpers
++// Aozora Glass — highlight helpers
+ 
+-#ifndef LIQUIDGLASS_HIGHLIGHT_GLSL
+-#define LIQUIDGLASS_HIGHLIGHT_GLSL
++#ifndef AOZORAGLASS_HIGHLIGHT_GLSL
++#define AOZORAGLASS_HIGHLIGHT_GLSL
+ 
+ // Y-axis-agnostic angular weight: brighter where outNorm faces "up",
+ // softer at the sides, dimmer on the bottom. Reference shader uses
+diff -ruN a/src/shaders/glass_core.frag b/src/shaders/glass_core.frag
+--- a/src/shaders/glass_core.frag	2026-09-26 23:10:10.493399449 +0900
++++ b/src/shaders/glass_core.frag	2026-09-26 23:10:10.496941384 +0900
+@@ -3,10 +3,10 @@
+ #define LG_SAMPLE(tex, coord) texture(tex, coord)
+ #define LG_OUT fragColor
+ 
+-// MacTahoe Liquid KDE — Acrylic Glass SDF helpers
++// Aozora Glass — SDF helpers
+ 
+-#ifndef LIQUIDGLASS_SDF_GLSL
+-#define LIQUIDGLASS_SDF_GLSL
++#ifndef AOZORAGLASS_SDF_GLSL
++#define AOZORAGLASS_SDF_GLSL
+ 
+ uniform vec2 blurSize;
+ 
+@@ -35,10 +35,10 @@
+ 
+ #endif
+ 
+-// MacTahoe Liquid KDE — Acrylic Glass blur helpers
++// Aozora Glass — blur helpers
+ 
+-#ifndef LIQUIDGLASS_BLUR_GLSL
+-#define LIQUIDGLASS_BLUR_GLSL
++#ifndef AOZORAGLASS_BLUR_GLSL
++#define AOZORAGLASS_BLUR_GLSL
+ 
+ // Shared SAMPLES×SAMPLES tap grid used by every kernel below.
+ #define LG_BLUR_SAMPLES 9
+@@ -129,10 +129,10 @@
+ 
+ #endif
+ 
+-// MacTahoe Liquid KDE — Acrylic Glass lens + chromatic distortion helpers
++// Aozora Glass — lens + chromatic distortion helpers
+ 
+-#ifndef LIQUIDGLASS_DISTORT_GLSL
+-#define LIQUIDGLASS_DISTORT_GLSL
++#ifndef AOZORAGLASS_DISTORT_GLSL
++#define AOZORAGLASS_DISTORT_GLSL
+ 
+ vec2 lgLensUV(vec2 uv, float magnifyGlassStrength, float edgeQ)
+ {
+@@ -175,10 +175,10 @@
+ 
+ #endif
+ 
+-// MacTahoe Liquid KDE — Acrylic Glass highlight helpers
++// Aozora Glass — highlight helpers
+ 
+-#ifndef LIQUIDGLASS_HIGHLIGHT_GLSL
+-#define LIQUIDGLASS_HIGHLIGHT_GLSL
++#ifndef AOZORAGLASS_HIGHLIGHT_GLSL
++#define AOZORAGLASS_HIGHLIGHT_GLSL
+ 
+ // Y-axis-agnostic angular weight: brighter where outNorm faces "up",
+ // softer at the sides, dimmer on the bottom. Reference shader uses
+diff -ruN a/src/shaders/highlight.glsl b/src/shaders/highlight.glsl
+--- a/src/shaders/highlight.glsl	2026-09-26 23:10:10.492930968 +0900
++++ b/src/shaders/highlight.glsl	2026-09-26 23:10:10.497024460 +0900
+@@ -1,7 +1,7 @@
+-// MacTahoe Liquid KDE — Acrylic Glass highlight helpers
++// Aozora Glass — highlight helpers
+ 
+-#ifndef LIQUIDGLASS_HIGHLIGHT_GLSL
+-#define LIQUIDGLASS_HIGHLIGHT_GLSL
++#ifndef AOZORAGLASS_HIGHLIGHT_GLSL
++#define AOZORAGLASS_HIGHLIGHT_GLSL
+ 
+ // Y-axis-agnostic angular weight: brighter where outNorm faces "up",
+ // softer at the sides, dimmer on the bottom. Reference shader uses
+diff -ruN a/src/shaders/sdf.glsl b/src/shaders/sdf.glsl
+--- a/src/shaders/sdf.glsl	2026-09-26 23:10:10.493545198 +0900
++++ b/src/shaders/sdf.glsl	2026-09-26 23:10:10.496929356 +0900
+@@ -1,7 +1,7 @@
+-// MacTahoe Liquid KDE — Acrylic Glass SDF helpers
++// Aozora Glass — SDF helpers
+ 
+-#ifndef LIQUIDGLASS_SDF_GLSL
+-#define LIQUIDGLASS_SDF_GLSL
++#ifndef AOZORAGLASS_SDF_GLSL
++#define AOZORAGLASS_SDF_GLSL
+ 
+ uniform vec2 blurSize;
+ 

@@ -1,0 +1,7 @@
+# Lock screen background: ClearSky wallpaper package (light/dark variants)
+[Greeter]
+WallpaperPlugin=org.kde.image
+
+[Greeter][Wallpaper][org.kde.image][General]
+Image=file:///usr/share/wallpapers/ClearSky/
+PreviewImage=file:///usr/share/wallpapers/ClearSky/contents/images/5120x2880.png

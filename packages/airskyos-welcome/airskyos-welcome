@@ -1,0 +1,4 @@
+#!/bin/sh
+# AirSkyOS ようこそアプリ ランチャー
+export PYTHONPATH="/usr/share/airskyos-welcome${PYTHONPATH:+:$PYTHONPATH}"
+exec /usr/bin/python3 -m airskyos_welcome "$@"

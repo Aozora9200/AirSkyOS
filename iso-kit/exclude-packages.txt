@@ -1,0 +1,5 @@
+# Packages that must NOT go into the ISO, one per line.
+# (CachyOS Hello and the Limine auto-deploy hooks are always excluded,
+#  see ALWAYS_EXCLUDE in config.sh)
+# Add dev-only tools here, e.g.:
+# virtualbox-guest-utils

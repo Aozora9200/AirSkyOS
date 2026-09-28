@@ -1,0 +1,32 @@
+AirSkyOS logo and icons
+Copyright (c) 2026 Aozora. All rights reserved.
+
+Covered files:
+  packages/airskyos-branding/assets/AirSky-logo.svg
+  packages/airskyos-branding/assets/launcher/aozora.png
+  packages/airskyos-branding/assets/launcher/aozora1.png
+  packages/airskyos-welcome/airskyos_welcome/qml/logo.svg
+  theme/ClearSky/contents/splash/images/aozora.png
+  theme/ClearSky Dark/contents/splash/images/aozora.png
+  and the same images when installed by the AirSkyOS packages.
+
+You may copy and redistribute these files unmodified, only as part of
+AirSkyOS or of an unmodified AirSkyOS package, or to refer to AirSkyOS.
+Any other use (in particular in a modified or derived distribution, a
+product or a service) requires prior written permission from Aozora.
+
+A derived distribution based on this repository must replace these files
+with its own logo and icons.
+
+----
+
+AirSkyOS ロゴとアイコン
+Copyright (c) 2026 Aozora. All rights reserved.
+
+上記のファイルは、AirSkyOS の一部として、または改変していない AirSkyOS
+パッケージの一部として、あるいは AirSkyOS を紹介する目的に限り、改変せずに
+複製・再配布できます。それ以外の利用 (特に改変版・派生ディストリビューション、
+製品、サービスでの利用) には、Aozora の事前の書面による許可が必要です。
+
+このリポジトリを元に派生ディストリビューションを作る場合は、これらのファイルを
+独自のロゴとアイコンに置き換えてください。

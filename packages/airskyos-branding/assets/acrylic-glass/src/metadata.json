@@ -1,0 +1,15 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Lester Cordero Murillo, Aozora"
+            }
+        ],
+        "Category": "Appearance",
+        "Description": "Aozora Glass — blur and rounded corners for KDE Plasma 6.",
+        "EnabledByDefault": false,
+        "License": "GPL",
+        "Name": "Aozora Glass"
+    },
+    "X-KDE-ConfigModule": "kwin_aozoraglass_config"
+}

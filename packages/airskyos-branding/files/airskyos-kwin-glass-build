@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Build / install / remove the Aozora Glass KWin effect.
+#
+# KWin effects use KWin's private ABI, so the binary has to be rebuilt every
+# time kwin changes. This works like DKMS: the source lives in
+# /usr/src/airskyos-kwin-glass and a pacman hook runs this script after
+# kwin / kdecoration / qt6-base / this package are installed or upgraded.
+#
+#   airskyos-kwin-glass-build            build if kwin changed since last build
+#   airskyos-kwin-glass-build --force    always rebuild
+#   airskyos-kwin-glass-build --remove   uninstall the built files
+#
+# It never fails the pacman transaction; details go to the log file.
+
+set -u
+
+SRC=/usr/src/airskyos-kwin-glass
+STATE=/var/lib/airskyos-kwin-glass
+CACHE=/var/cache/airskyos-kwin-glass
+LOG=/var/log/airskyos-kwin-glass-build.log
+MANIFEST=$STATE/installed-files
+STAMP=$STATE/built-for
+
+msg()  { printf '==> AirSkyOS glass: %s\n' "$*"; }
+warn() { printf '==> AirSkyOS glass WARNING: %s\n' "$*" >&2; }
+
+if ((EUID != 0)); then
+    echo "run as root: sudo $0 $*" >&2
+    exit 1
+fi
+
+remove_installed() {
+    [[ -f $MANIFEST ]] || return 0
+    local f
+    while IFS= read -r f; do
+        [[ -n $f && ( -f $f || -L $f ) ]] && rm -f -- "$f"
+    done <"$MANIFEST"
+    rm -f -- "$MANIFEST" "$STAMP"
+}
+
+pkgver_of() { pacman -Q "$1" 2>/dev/null | awk '{print $2}'; }
+
+build_id() {
+    # everything the binary depends on ABI-wise
+    printf 'src=%s kwin=%s kwin-x11=%s kdecoration=%s qt6-base=%s' \
+        "$(cat "$SRC/.version" 2>/dev/null)" \
+        "$(pkgver_of kwin)" "$(pkgver_of kwin-x11)" \
+        "$(pkgver_of kdecoration)" "$(pkgver_of qt6-base)"
+}
+
+all_installed() {
+    [[ -s $MANIFEST ]] || return 1
+    local f
+    while IFS= read -r f; do [[ -e $f ]] || return 1; done <"$MANIFEST"
+}
+
+do_build() {
+    local force=$1 id build stage x11=OFF
+    if [[ ! -f $SRC/CMakeLists.txt ]]; then
+        warn "source not found in $SRC"
+        return 0
+    fi
+    if ! pacman -Q kwin >/dev/null 2>&1; then
+        msg "kwin is not installed, skipping"
+        return 0
+    fi
+
+    id=$(build_id)
+    if [[ $force == 0 && -f $STAMP && $(cat "$STAMP") == "$id" ]] && all_installed; then
+        msg "already built for this kwin, nothing to do"
+        return 0
+    fi
+
+    pacman -Q kwin-x11 >/dev/null 2>&1 && x11=ON
+    build=$CACHE/build
+    stage=$CACHE/stage
+    rm -rf -- "$build" "$stage"
+    mkdir -p -- "$build" "$stage" "$STATE"
+
+    msg "building Aozora Glass for kwin $(pkgver_of kwin) (log: $LOG)..."
+    {
+        echo "===== $(date -Is) $id"
+        cmake -S "$SRC" -B "$build" \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF \
+            -DGLASS_WAYLAND=ON \
+            -DGLASS_X11="$x11" \
+            -Wno-dev &&
+        cmake --build "$build" --parallel "$(nproc)" &&
+        DESTDIR="$stage" cmake --install "$build"
+    } >>"$LOG" 2>&1
+    local rc=$?
+
+    # The old binary was built for the previous kwin and may crash the new
+    # one, so it is removed whether or not the new build succeeded.
+    remove_installed
+
+    if ((rc != 0)); then
+        warn "build failed; the glass effect is disabled until the next successful build."
+        warn "see $LOG, then retry with: sudo airskyos-kwin-glass-build --force"
+        tail -n 15 "$LOG" >&2
+        rm -rf -- "$build" "$stage"
+        return 0
+    fi
+
+    (cd "$stage" && find . \( -type f -o -type l \) -printf '/%P\n') >"$MANIFEST.new"
+    local f
+    while IFS= read -r f; do
+        install -Dm755 -- "$stage$f" "$f"
+    done <"$MANIFEST.new"
+    mv -f "$MANIFEST.new" "$MANIFEST"
+    printf '%s\n' "$id" >"$STAMP"
+    rm -rf -- "$build" "$stage"
+    msg "installed. Log out and back in (or restart KWin) to load the new effect."
+}
+
+case "${1:-}" in
+    "")        do_build 0 ;;
+    --force)   do_build 1 ;;
+    --remove)  remove_installed; rm -rf -- "$CACHE"; msg "removed" ;;
+    *) echo "usage: $0 [--force|--remove]" >&2; exit 1 ;;
+esac
+exit 0

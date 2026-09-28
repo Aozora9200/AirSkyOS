@@ -1,0 +1,19 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "aozora9200@gmail.com",
+                "Name": "Aozora"
+            }
+        ],
+        "Description": "AirSkyOS light theme",
+        "Id": "ClearSky",
+        "License": "GPL-2.0-or-later",
+        "Name": "ClearSky",
+        "Website": "https://github.com/aozora9200/AirSkyOS"
+    },
+    "Keywords": "Desktop;Workspace;Appearance;Look and Feel;",
+    "X-Plasma-APIVersion": "2",
+    "X-Plasma-MainScript": "default"
+}

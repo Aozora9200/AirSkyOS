@@ -1,0 +1,86 @@
+#!/bin/sh
+# AirSkyOS: runs INSIDE the newly installed system (Calamares shellprocess,
+# right after the live image was copied, before users / initramfs / boot
+# loader are set up). Removed again at the end of the installation.
+#
+# The copied image is the live ISO, so it still contains live-only settings
+# and has no kernels in /boot (the ISO keeps them outside the image).
+#   1. kernels: /usr/lib/modules/<ver>/vmlinuz -> /boot/vmlinuz-<pkgbase>
+#      and a normal mkinitcpio preset for each (instead of the ISO one)
+#   2. remove live-only configuration (autologin, password-less sudo/polkit,
+#      volatile journal, "never suspend", live services, live skel files)
+#   3. pacman keyring: on the live ISO it lives in RAM (tmpfs), so the copy
+#      has an empty /etc/pacman.d/gnupg -> create and fill it here
+
+T=${AIRSKYOS_TEST_ROOT:-}   # for testing only; empty in the installer
+echo "AirSkyOS: preparing the installed system"
+
+# --- 1. kernels + initramfs presets ----------------------------------------
+rm -f $T/etc/mkinitcpio.conf.d/archiso.conf
+for p in $T/etc/mkinitcpio.d/*.preset; do
+    [ -f "$p" ] && grep -q 'archiso' "$p" && rm -f "$p"
+done
+for d in $T/usr/lib/modules/*/; do
+    [ -f "$d/pkgbase" ] && [ -f "$d/vmlinuz" ] || continue
+    pb=$(cat "$d/pkgbase")
+    install -Dm644 "$d/vmlinuz" "$T/boot/vmlinuz-$pb"
+    if [ -f $T/usr/share/mkinitcpio/hook.preset ] && [ ! -f "$T/etc/mkinitcpio.d/$pb.preset" ]; then
+        mkdir -p $T/etc/mkinitcpio.d
+        sed "s|%PKGBASE%|$pb|g" $T/usr/share/mkinitcpio/hook.preset >"$T/etc/mkinitcpio.d/$pb.preset"
+    fi
+    echo "  kernel: $pb"
+done
+
+# --- 2. live-only configuration ------------------------------------------------
+for f in \
+    $T/etc/plasmalogin.conf.d/autologin.conf \
+    $T/etc/polkit-1/rules.d/49-nopasswd_global.rules \
+    $T/etc/sudoers.d/g_wheel \
+    $T/etc/ssh/sshd_config.d/10-archiso.conf \
+    $T/etc/systemd/system/getty@tty1.service.d/autologin.conf \
+    $T/etc/systemd/journald.conf.d/volatile-storage.conf \
+    $T/etc/systemd/logind.conf.d/do-not-suspend.conf \
+    $T/etc/systemd/system/livecd-alsa-unmuter.service \
+    $T/etc/systemd/system/livecd-talk.service \
+    $T/etc/systemd/system/pacman-init.service \
+    $T/etc/systemd/system/etc-pacman.d-gnupg.mount \
+    $T/etc/systemd/system/sound.target.wants/livecd-alsa-unmuter.service \
+    $T/etc/systemd/system/multi-user.target.wants/livecd-talk.service \
+    $T/etc/systemd/system/multi-user.target.wants/pacman-init.service \
+    $T/etc/systemd/system/multi-user.target.wants/sshd.service \
+    $T/etc/systemd/system/multi-user.target.wants/systemd-networkd.service \
+    $T/etc/systemd/system/sockets.target.wants/systemd-networkd.socket \
+    $T/etc/systemd/system/multi-user.target.wants/hv_fcopy_daemon.service \
+    $T/etc/systemd/system/multi-user.target.wants/hv_kvp_daemon.service \
+    $T/etc/systemd/system/multi-user.target.wants/hv_vss_daemon.service \
+    $T/etc/systemd/system/multi-user.target.wants/vboxservice.service \
+    $T/etc/systemd/system/multi-user.target.wants/vmtoolsd.service \
+    $T/etc/systemd/system/multi-user.target.wants/vmware-vmblock-fuse.service \
+    $T/etc/skel/.config/kded5rc \
+    $T/etc/skel/.config/kscreenlockerrc \
+    $T/etc/skel/.config/kwalletrc \
+    $T/etc/skel/.config/plasma-welcomerc \
+    $T/etc/skel/.config/powerdevilrc \
+    $T/etc/skel/.config/powermanagementprofilesrc \
+    $T/root/.automated_script.sh \
+    $T/root/.zlogin
+do
+    rm -f "$f"
+done
+rm -rf $T/etc/skel/.config/systemd/user/plasma-login-kwin_wayland.service.d
+rm -rf $T/etc/systemd/system/getty@tty1.service.d 2>/dev/null
+rmdir $T/etc/plasmalogin.conf.d $T/etc/systemd/journald.conf.d $T/etc/systemd/logind.conf.d 2>/dev/null
+
+# --- 3. pacman keyring --------------------------------------------------------
+G=$T/etc/pacman.d/gnupg
+if [ ! -s "$G/pubring.gpg" ] && [ ! -s "$G/pubring.kbx" ]; then
+    if [ -n "$T" ]; then
+        echo "  keyring: would run pacman-key --init / --populate"
+    else
+        rm -rf "$G"
+        pacman-key --init && pacman-key --populate && echo "  keyring: created" \
+            || echo "  keyring: FAILED - run 'sudo pacman-key --init && sudo pacman-key --populate' after installation"
+        gpgconf --homedir "$G" --kill all 2>/dev/null
+    fi
+fi
+exit 0

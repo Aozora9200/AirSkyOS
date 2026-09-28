@@ -1,0 +1,14 @@
+[Wallpaper]
+defaultWallpaperTheme=ClearSky
+defaultFileSuffix=.png
+defaultWidth=5120
+defaultHeight=2880
+
+[ContrastEffect]
+enabled=false
+contrast=0.2
+intensity=1.4
+saturation=10
+
+[AdaptiveTransparency]
+enabled=true

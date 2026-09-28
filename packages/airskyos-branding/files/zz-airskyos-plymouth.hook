@@ -1,0 +1,15 @@
+# Keeps the AirSkyOS boot animation selected after plymouth / CachyOS theme
+# updates, and rebuilds the initramfs when the AirSkyOS theme itself changes.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = plymouth
+Target = cachyos-plymouth-*
+Target = airskyos-plymouth-theme
+
+[Action]
+Description = Checking AirSkyOS boot animation...
+When = PostTransaction
+NeedsTargets
+Exec = /usr/share/libalpm/scripts/airskyos-branding plymouth-hook

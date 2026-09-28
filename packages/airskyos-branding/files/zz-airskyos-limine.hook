@@ -1,0 +1,25 @@
+# Put the AirSkyOS name / theme / splash back into the Limine boot menu after
+# anything that may rewrite it (runs after limine-entry-tool's own hooks).
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = limine
+Target = limine-entry-tool
+Target = limine-mkinitcpio-hook
+Target = limine-snapper-sync
+Target = cachyos-snapper-support
+Target = cachyos-settings
+Target = cachyos-hooks
+Target = airskyos-release
+
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/lib/modules/*/vmlinuz
+
+[Action]
+Description = Restoring AirSkyOS Limine boot menu branding...
+When = PostTransaction
+Exec = /usr/share/libalpm/scripts/airskyos-limine

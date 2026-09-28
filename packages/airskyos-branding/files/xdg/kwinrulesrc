@@ -1,0 +1,12 @@
+# "Glass" window rule: 85% opacity when active, 60% when inactive
+[General]
+count=1
+rules=airskyos-glass
+
+[airskyos-glass]
+Description=Glass
+opacityactive=85
+opacityactiverule=2
+opacityinactive=60
+opacityinactiverule=2
+wmclasscomplete=true

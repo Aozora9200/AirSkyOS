@@ -1,0 +1,15 @@
+# Rebuild the Aozora Glass KWin effect whenever KWin (or its ABI deps) change.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = kwin
+Target = kwin-x11
+Target = kdecoration
+Target = qt6-base
+Target = airskyos-kwin-glass
+
+[Action]
+Description = Building Aozora Glass KWin effect for the installed KWin...
+When = PostTransaction
+Exec = /usr/lib/airskyos/airskyos-kwin-glass-build

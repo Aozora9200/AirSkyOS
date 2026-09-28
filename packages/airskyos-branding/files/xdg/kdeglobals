@@ -1,0 +1,12 @@
+# AirSkyOS system-wide KDE defaults (user settings in ~/.config override these)
+[General]
+ColorScheme=BreezeLight
+
+[Icons]
+Theme=breeze
+
+[KDE]
+LookAndFeelPackage=ClearSky
+DefaultLightLookAndFeel=ClearSky
+DefaultDarkLookAndFeel=ClearSky Dark
+widgetStyle=kvantum

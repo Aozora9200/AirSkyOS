@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=AirSkyOS live session
+Exec=/usr/local/bin/airskyos-live-session
+OnlyShowIn=KDE;
+NoDisplay=true
+X-KDE-autostart-phase=1

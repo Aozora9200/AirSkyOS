@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=AirSkyOS Welcome
+Name[ja]=AirSkyOS へようこそ
+Comment[ja]=ログイン時にようこそ画面を表示します(アプリ内のスイッチでオフにできます)
+Exec=airskyos-welcome --autostart
+Icon=airskyos-welcome
+Terminal=false
+NoDisplay=true
+X-KDE-autostart-phase=2

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Start the AirSkyOS installer (live ISO only).
+# Re-applies the AirSkyOS installer settings first, then starts Calamares.
+if ! sudo -n /usr/local/bin/airskyos-installer-setup >/tmp/airskyos-installer-setup.log 2>&1; then
+    msg="AirSkyOS installer setup failed. See /tmp/airskyos-installer-setup.log"
+    command -v kdialog >/dev/null 2>&1 && kdialog --error "$msg" || echo "$msg" >&2
+    exit 1
+fi
+exec /usr/local/bin/calamares-online.sh "$@"

@@ -1,0 +1,173 @@
+#!/bin/sh
+# AirSkyOS installer setup (live ISO only, runs as root).
+#
+# Turns the CachyOS installer (Calamares) into the AirSkyOS installer.
+# It runs twice on purpose:
+#   1. while the ISO is built (pacman hook), so the image is already correct
+#   2. every time "Install AirSkyOS" is started, right before Calamares,
+#      so nothing that happened in between can bring CachyOS back
+# Safe to run any number of times.
+#
+#   - ONE installation method: copy this live system (offline). The CachyOS
+#     online mode (downloads plain CachyOS, desktop / boot loader choice) is
+#     replaced in every settings file Calamares may read.
+#   - boot loader: Limine only, EFI entry "airskyos", AirSkyOS splash / menu
+#   - AirSkyOS branding, host name "airskyos-<cpu>"
+#   - every kernel on the ISO is copied to the new system
+#   - AirSkyOS Limine theme applied inside the new system at the end
+#
+# Prints AIRSKYOS-INSTALLER-OK, or AIRSKYOS-ISO-CHECK-FAILED: <reason>.
+
+R=${AIRSKYOS_TEST_ROOT:-}          # for testing only; empty on the ISO
+S=$R/usr/share/calamares
+E=$R/etc/calamares
+M=$E/modules
+B=$S/branding/airskyos
+
+if [ -z "$R" ] && [ "$(id -u)" != 0 ]; then
+    echo "run as root" >&2
+    exit 1
+fi
+
+# --- settings: offline sequence + AirSkyOS branding everywhere ------------
+src=""
+for f in "$S/settings_offline.conf" "$E/settings_offline.conf"; do
+    [ -f "$f" ] && grep -q unpackfs "$f" && { src=$f; break; }
+done
+if [ -n "$src" ]; then
+    tmp=$(mktemp)
+    sed -e 's/^branding:.*/branding: airskyos/' "$src" >"$tmp"
+    # AirSkyOS step inside the new system, right after the image is copied
+    if ! grep -q 'airskyos_target' "$tmp"; then
+        sed -i -e '/^instances:/a - id:       airskyos_target\n  module:   shellprocess\n  config:   shellprocess_airskyos_target.conf\n' \
+               -e 's/^  - machineid$/  - machineid\n  - shellprocess@airskyos_target/' "$tmp"
+    fi
+    for f in "$S/settings.conf" "$S/settings_online.conf" "$S/settings_offline.conf" "$E/settings.conf"; do
+        mkdir -p "$(dirname "$f")"
+        cmp -s "$tmp" "$f" || cp -f "$tmp" "$f"
+    done
+    rm -f "$tmp"
+fi
+
+# --- boot loader: Limine only ----------------------------------------------
+if [ -f "$M/bootloader.conf" ]; then
+    sed -i \
+        -e '/^efiBootLoaderVar:/d' \
+        -e 's|^efiBootLoader:.*|efiBootLoader: "limine"|' \
+        -e 's|^efiBootloaderId:.*|efiBootloaderId: "airskyos"|' \
+        -e 's|^limineSplashLogo:.*|limineSplashLogo: "/usr/share/airskyos/limine/airskyos-splash.jpg"|' \
+        "$M/bootloader.conf"
+fi
+for py in $(find $R/usr/lib/calamares $R/usr/share/calamares -path '*bootloader/main.py' 2>/dev/null); do
+    sed -i 's|/+CachyOS|/+AirSkyOS|g' "$py"
+done
+
+# --- names ----------------------------------------------------------------
+[ -f "$M/users.conf" ] && sed -i 's|template: "cachyos-|template: "airskyos-|' "$M/users.conf"
+for f in "$M"/shellprocess-before.conf "$M"/shellprocess-before-online.conf; do
+    [ -f "$f" ] && sed -i 's/CachyOS/AirSkyOS/g' "$f"
+done
+if [ -f "$M/welcome.conf" ]; then
+    sed -i -e 's/^showSupportUrl:.*/showSupportUrl:         false/' \
+           -e 's/^showKnownIssuesUrl:.*/showKnownIssuesUrl:     false/' "$M/welcome.conf"
+fi
+
+# --- what to copy: find the live image wherever this boot put it ------------
+# Normally /run/archiso/bootmnt/arch/x86_64/airootfs.sfs, but with copytoram
+# (default when there is enough RAM) the boot medium is unmounted and the
+# image lives in /run/archiso/copytoram/. As a last resort copy the mounted
+# image directory /run/archiso/airootfs (the untouched lower layer).
+root_src=/run/archiso/bootmnt/arch/x86_64/airootfs.sfs
+root_fs=squashfs
+if [ -z "$R" ]; then
+    found=""
+    for c in /run/archiso/bootmnt/arch/x86_64/airootfs.sfs \
+             /run/archiso/copytoram/airootfs.sfs \
+             $(find /run/archiso -maxdepth 5 \( -name 'airootfs.sfs' -o -name 'airootfs.erofs' \) 2>/dev/null); do
+        [ -f "$c" ] && { found=$c; break; }
+    done
+    if [ -n "$found" ]; then
+        root_src=$found
+        case "$found" in *.erofs) root_fs=erofs ;; *) root_fs=squashfs ;; esac
+    elif [ -d /run/archiso/airootfs/usr ]; then
+        root_src=/run/archiso/airootfs
+        root_fs=ext4          # a directory: Calamares bind-mounts it and copies with rsync
+    fi
+fi
+{
+    echo "# Written by airskyos-installer-setup - regenerated on every installer start"
+    echo "unpack:"
+    echo "    -   source: \"$root_src\""
+    echo "        sourcefs: \"$root_fs\""
+    echo "        destination: \"\""
+    # kernels are also put in place by airskyos-target-setup from
+    # /usr/lib/modules, so these are optional
+    for k in linux-cachyos linux-cachyos-lts linux-cachyos-bore linux-cachyos-rc \
+             linux-cachyos-server linux-cachyos-hardened linux-cachyos-eevdf \
+             linux-cachyos-deckify linux linux-lts linux-zen; do
+        echo "    -   source: \"/run/archiso/bootmnt/arch/boot/x86_64/vmlinuz-$k\""
+        echo "        sourcefs: \"file\""
+        echo "        destination: \"/boot/vmlinuz-$k\""
+        echo "        optional: true"
+    done
+} >"$M/unpackfs.conf"
+echo "  live image: $root_src ($root_fs)"
+
+# --- AirSkyOS step inside the new system ----------------------------------------
+cat >"$M/shellprocess_airskyos_target.conf" <<'SPT'
+---
+dontChroot: false
+timeout: 900
+script:
+    - command: "/usr/local/bin/airskyos-target-setup"
+      timeout: 900
+i18n:
+    name: "Preparing AirSkyOS"
+    name[ja]: "AirSkyOS を準備しています"
+SPT
+
+# --- last step inside the new system: AirSkyOS Limine name / theme / splash --
+sp="$M/shellprocess.conf"
+if [ -f "$sp" ] && ! grep -q 'airskyos-limine' "$sp"; then
+    cat >>"$sp" <<'SP'
+    # AirSkyOS: Limine name, theme and splash (also fixes limine-snapper-sync)
+    - "-/usr/share/libalpm/scripts/airskyos-limine"
+SP
+fi
+# --- and the very last one: remove the installer from the new system ---------
+# (must come after dmcheck / shell-setup / bootloader-post-setup, which live
+#  in /etc/calamares/scripts)
+if [ -f "$sp" ] && ! grep -q 'airskyos-finish' "$sp"; then
+    cat >>"$sp" <<'SP'
+    # AirSkyOS: remove the installer (Calamares) now that its scripts have run
+    - command: "-/usr/local/bin/airskyos-finish"
+      timeout: 900
+SP
+fi
+
+# --- check ------------------------------------------------------------------
+fail=""
+grep -q '^branding: airskyos' $E/settings.conf 2>/dev/null || fail="$fail settings.conf-not-airskyos"
+grep -q 'unpackfs' $E/settings.conf 2>/dev/null || fail="$fail not-offline"
+grep -q 'packagechooser@bootloader\|packagechooser@desktop\|netinstall' $E/settings.conf 2>/dev/null && fail="$fail online-pages-left"
+grep -q 'branding: airskyos' "$S/settings.conf" 2>/dev/null || fail="$fail default-settings-not-airskyos"
+[ -f "$B/branding.desc" ] || fail="$fail no-branding-dir"
+grep -q 'shellprocess@airskyos_target' $E/settings.conf 2>/dev/null || fail="$fail no-target-step"
+[ -f "$M/shellprocess_airskyos_target.conf" ] || fail="$fail no-target-step-config"
+[ -z "$R" ] && [ ! -x /usr/local/bin/airskyos-target-setup ] && fail="$fail no-target-setup-script"
+if [ -z "$R" ] && [ -d /run/archiso ] && [ ! -e "$root_src" ]; then fail="$fail live-image-not-found"; fi
+grep -q 'airskyos-finish' "$sp" 2>/dev/null || fail="$fail no-finish-step"
+if [ -z "$R" ]; then
+    for s in $(sed -n 's|.*"\(/etc/calamares/scripts/[^" ]*\).*|\1|p' "$sp" 2>/dev/null | grep -v '^-' | sort -u); do
+        [ -x "$s" ] || fail="$fail missing:$s"
+    done
+    sed -n '/_packages_to_remove=(/,/^)/p' /usr/local/bin/removeun 2>/dev/null | grep -q calamares && fail="$fail removeun-removes-installer"
+    [ -x /usr/local/bin/airskyos-finish ] || fail="$fail no-finish-script"
+fi
+grep -q '^efiBootLoader: "limine"' "$M/bootloader.conf" 2>/dev/null || fail="$fail bootloader-not-limine"
+if [ -n "$fail" ]; then
+    echo "AIRSKYOS-ISO-CHECK-FAILED: installer is not AirSkyOS:$fail"
+    exit 1
+fi
+echo "AIRSKYOS-INSTALLER-OK"
+exit 0

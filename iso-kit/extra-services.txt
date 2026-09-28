@@ -1,0 +1,5 @@
+# systemd services to enable in the ISO and in installed systems,
+# one unit per line (see export/services-enabled.txt for what your PC uses).
+# Example:
+# bluetooth.service
+# cups.service

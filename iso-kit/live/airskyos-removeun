@@ -1,0 +1,47 @@
+#!/bin/bash
+# AirSkyOS replacement for CachyOS's /usr/local/bin/removeun.
+# Runs inside the new system (Calamares "shellprocess@before"). Removes
+# live-only tools from the copied live image.
+#
+# Changes from CachyOS's version:
+#   * "pacman -Rns" instead of "-Rsnc": a package that something else still
+#     needs stays, instead of taking the other packages with it
+#   * packages you had installed yourself on the AirSkyOS PC are never on
+#     the list (03-prepare-profile.sh leaves them out)
+#   * the installer (Calamares) is NOT removed here, because the steps after
+#     this one still run its scripts (/etc/calamares/scripts/dmcheck, ...).
+#     airskyos-finish removes it as the very last step.
+
+_packages_to_remove=(
+# @AIRSKYOS_PACKAGES@
+)
+
+_files_to_remove=(
+  /usr/local/bin/choose-mirror
+  /usr/local/bin/prepare-live-desktop.sh
+  /usr/local/bin/removeun-online
+  /usr/local/share/livecd-sound
+  /usr/local/bin/airskyos-install
+  /usr/local/bin/airskyos-installer
+  /usr/local/bin/airskyos-live-session
+  /usr/local/bin/airskyos-installer-setup
+  /usr/local/bin/airskyos-target-setup
+  /usr/share/applications/airskyos-install.desktop
+  /etc/xdg/autostart/airskyos-live-session.desktop
+)
+
+for p in "${_packages_to_remove[@]}"; do
+  pacman -Qq "$p" >/dev/null 2>&1 || continue
+  pacman -Rns --noconfirm "$p" >/dev/null 2>&1 && echo "removed: $p" || echo "kept (still needed): $p"
+done
+
+# NVIDIA drivers only when there is no NVIDIA card (same as CachyOS)
+if command -v chwd >/dev/null 2>&1 && ! chwd --is_nvidia_card 2>/dev/null | grep -q 'NVIDIA card found!'; then
+  echo "No NVIDIA card detected. Removing nvidia drivers"
+  for p in linux-cachyos-lts-nvidia-open nvidia-utils egl-wayland; do
+    pacman -Qq "$p" >/dev/null 2>&1 && pacman -Rsnc "$p" --noconfirm
+  done
+fi
+
+for f in "${_files_to_remove[@]}"; do rm -rf "$f" || true; done
+exit 0
